@@ -1,5 +1,5 @@
 import numpy as np
-#import torch
+import torch
 from scipy.stats import multivariate_normal
 
 class RoI:
@@ -14,6 +14,7 @@ class RoI:
 
         masks = [torch.from_numpy(self.f(self.shape)).float() for i in range(n)]
         masks = torch.stack(masks).to(self.device)
+        masks = masks.unsqueeze(0).permute(1, 0, 2, 3)
 
         return masks
 

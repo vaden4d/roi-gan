@@ -1,46 +1,68 @@
 import torch
 from torch.autograd import Variable
+from Losses import roi_loss
 
 class Trainer:
-    def __init__(self, model, optimizer, criterion, metric, clip_norm, writer, device):
+    def __init__(self, models, optimizers, losses, device):
 
         self.device = device
 
         if self.device.type == 'cuda':
-            self.model = model.cuda()
+            self.gen, self.dis = models[0].cuda(), models[1].cuda()
         else:
-            self.model = model
+            self.gen, self.dis = models
 
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.clip_norm = clip_norm
-        self.writer = writer
+        self.g_optimizer, self.d_optimizer = optimizers
+        self.g_loss, self.d_loss = losses
+
+        #self.clip_norm = clip_norm
+        #self.writer = writer
         self.num_updates = 0
 
-    def train_step(self, batch):
+    def train_step(self, noise, masks, batch):
 
-        self.model.train()
-        self.optimizer.zero_grad()
+        self.gen.train()
+        self.dis.train()
         self.num_updates += 1
-        features, responses_real = batch
-        responses_pred = self.model(features)
-        loss = self.criterion(responses_pred, responses_real)
-        self.backward(loss)
-        quality = metric(responses_pred, responses_real)
-        return loss, quality
 
-    def test_step(self, batch):
+        # Generator
+        self.g_optimizer.zero_grad()
+        generated_samples = self.gen(noise, masks)
+        probs_generated = self.dis(generated_samples)
 
-        self.model.eval()
-        features, responses_real = batch
-        responses_pred = self.model(features)
+        loss_g = self.g_loss(probs_generated)
+        #loss_roi = roi_loss(masks, generated_samples, batch)
+        loss_roi = ((masks - batch)**2).mean()
+        (loss_g + loss_roi).backward()
+        self.g_optimizer.step()
 
-        loss = self.criterion(responses_pred, responses_real)
-        quality = metric(responses_pred, responses_real)
-        return loss, quality
+        # Discriminator
+        self.d_optimizer.zero_grad()
+        probs_real = self.dis(batch)
 
-    def backward(self, loss):
+        # with or without detach?
+        loss_d = self.d_loss(probs_generated.detach(), probs_real)
+        loss_d.backward()
+        self.d_optimizer.step()
 
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_norm)
-        self.optimizer.step()
+        return generated_samples, loss_g, loss_d
+
+    def test_step(self, noise, masks, batch):
+
+        self.gen.eval()
+        self.dis.eval()
+
+        generated_samples = self.gen(noise, masks)
+        probs_fake = self.dis(generated_samples)
+        probs_real = self.dis(batch)
+
+        loss_g = self.g_loss(probs_generated)
+        loss_d = self.d_loss(probs_generated, probs_real)
+
+        return generated_samples, loss_g, loss_d
+
+    #def backward(self, loss):
+
+    #    loss.backward()
+    #    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_norm)
+    #    self.optimizer.step()

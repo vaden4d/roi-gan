@@ -11,29 +11,6 @@ class Generator(nn.Module):
         self.n_latent = n_latent
         self.n_feats = n_feats
 
-        '''self.net = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d(self.n_latent, self.n_feats * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(self.n_feats * 8),
-            nn.LeakyReLU(),
-            # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(self.n_feats * 8, self.n_feats * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(self.n_feats * 4),
-            nn.ReLU(True),
-            # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(self.n_feats * 4, self.n_feats * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(self.n_feats * 2),
-            nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(self.n_feats * 2, self.n_feats, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(self.n_feats),
-            nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(self.n_feats, 3, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # state size. (nc) x 64 x 64
-        )'''
-
         self.deconv_1 = nn.ConvTranspose2d(self.n_latent, self.n_feats * 8, 4, 1, 0, bias=False)
         self.spade_1 = SPADE(self.n_feats * 8, 3)
 
