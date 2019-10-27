@@ -4,23 +4,26 @@ from scipy.stats import multivariate_normal
 
 class RoI:
 
-    def __init__(self, image_shape, sampling_rule, device):
+    def __init__(self, image_shape, sampling_rule, device, mode):
 
         self.shape = image_shape
         self.f = sampling_rule
         self.device = device
+        self.mode = mode
 
-    def generate_masks(self, n, mode='duplicate'):
+    def generate_masks(self, n):
 
-        if mode == 'full':
+        if self.mode == 'full':
             masks = [torch.from_numpy(self.f(self.shape)).float() for i in range(n)]
-            masks = torch.stack(masks).to(self.device)
+            masks = torch.stack(masks)
             masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
+            masks = masks.to(self.device)
 
-        elif mode == 'duplicate':
+        elif self.mode == 'duplicate':
             masks = torch.from_numpy(self.f(self.shape)).float()
             masks = masks.unsqueeze(0).repeat(3, 1, 1)
             masks = masks.unsqueeze(0).repeat(n, 1, 1, 1)
+            masks = masks.to(self.device)
 
         return masks
 

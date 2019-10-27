@@ -20,7 +20,6 @@ class Trainer:
         self.g_optimizer, self.d_optimizer = optimizers
         self.g_loss, self.d_loss = losses
 
-        self.criterion = criterion
         self.clip_norm = clip_norm
         self.writer = writer
         self.num_updates = num_updates
@@ -63,8 +62,8 @@ class Trainer:
         probs_fake = self.dis(generated_samples)
         probs_real = self.dis(batch)
 
-        loss_g = self.g_loss(probs_generated)
-        loss_d = self.d_loss(probs_generated, probs_real)
+        loss_g = self.g_loss(probs_fake)
+        loss_d = self.d_loss(probs_fake, probs_real)
 
         return generated_samples, loss_g, loss_d
 

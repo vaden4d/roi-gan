@@ -4,7 +4,16 @@ import os
 import numpy as np
 from PIL import Image
 
-ef save_model(model, optimizer, epoch, iter, chkp_dir, name):
+def pil_loader(path):
+    try:
+        with open(path, 'rb') as f:
+            with Image.open(f) as img:
+                return img.convert('RGB')
+    except Exception as e:
+        print(e)
+        return None
+
+def save_model(model, optimizer, epoch, iter, chkp_dir, name):
     state = {
         'model': model.state_dict(),
         'optimizer': optimizer.state_dict(),

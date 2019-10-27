@@ -1,54 +1,43 @@
-import pandas as pd
 import numpy as np
 import os
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torchvision.datasets import ImageFolder
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+from utils.functions import pil_loader
 
 class Data(Dataset):
 
-    def __init__(self, data_path=None):
+    def __init__(self, data_path, mean, std):
         '''
         Arguments:
             Path to train data folder (string): Folder with cell images
         '''
 
         self.data_path = data_path
-        self.mean, self.std = [0.5] * 3, [0.5] * 3
-        if self.data_path:
-            self.data = self.download(self.data_path)
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, value):
-        self._data = value
-        self.n = len(value)
-
-    def download(self, path_to_data):
-        """Load data from image folder"""
-
-        normalize = transforms.Normalize(mean=self.mean, std=self.std)
-        self.data = ImageFolder(root=path_to_data,
-                                transform=transforms.Compose([
+        self.transform = transforms.Compose([
                                     transforms.Resize((64, 64)),
                                     transforms.ToTensor(),
-                                    normalize
-                                    ]))
+                                    transforms.Normalize(mean, std)
+                                    ])
+        
+        _, _, self.files = next(os.walk(self.data_path))
+        self.files = list(filter(lambda x: x.endswith('.jpg'), self.files))
 
-        return self.data
+        self.n = len(self.files)
 
     def __len__(self):
         return self.n
 
     def __getitem__(self, idx):
-        return self.data[idx][0]
 
+        path = os.path.join(self.data_path, self.files[idx])
+        image = pil_loader(path)
+        image = self.transform(image)
+
+        return image
+'''
 class Splitter():
 
     def __init__(self, obj):
@@ -102,20 +91,19 @@ class Splitter():
         valid_obj.metadata = valid_metadata
 
         return train_obj, test_obj, valid_obj
-
+'''
 
 if __name__ == '__main__':
 
     import time
     start = time.time()
-    obj = Data()
-    obj.download('/Users/vaden4d/Documents/ds/roi-gan/cars_train')
-    train_data = obj.data
-    data_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-    print(train_data[0][0].size())
+    obj = Data('celeba/', [0.5] * 3, [0.5] * 3)
+    data_loader = DataLoader(obj, batch_size=64, shuffle=True)
     print('Time: ', time.time() - start)
-    for i, (imgs, _) in enumerate(data_loader):
-        print(imgs)
-        print(imgs.size())
-        if i > 2:
+    for i, batch in enumerate(data_loader):
+        start = time.time()
+        print(i)
+        print(batch.size())
+        print('Time: ', time.time() - start)
+        if i > 5:
             break

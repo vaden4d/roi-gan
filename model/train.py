@@ -17,6 +17,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = visible_devices
 import torchvision
 import torchvision.transforms as transforms
 
+import torch
 from torch.autograd import Variable
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -25,8 +26,8 @@ from torch.utils.data import DataLoader
 
 from Models import Generator, Discriminator
 from Trainer import Trainer
-from utils.rois import RoI, gaussian_roi
-from utils.functions import weights_init
+from utils.rois import RoI, gaussian_roi, squared_roi, mixture_roi
+from utils.functions import weights_init, save_model, load_model
 
 from Data import Data
 from torch.utils.data import DataLoader
@@ -34,6 +35,7 @@ from Losses import vanilla_generator_loss, vanilla_discriminator_loss
 from torchvision.utils import save_image
 
 from tensorboardX import SummaryWriter
+from torchsummary import summary
 
 device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
 
@@ -56,6 +58,16 @@ lr_gen = config.optimizator_hyperparams['lr_gen']
 lr_dis = config.optimizator_hyperparams['lr_dis']
 
 clip_norm = config.model_hyperparams['clip_norm']
+roi_mode = config.model_hyperparams['roi_mode']
+roi_function = config.model_hyperparams['function']
+
+print_summary = config.print_summary
+
+gen_n_hidden_spade = config.model_hyperparams['gen_n_hidden_spade']
+gen_n_input = config.model_hyperparams['gen_n_input']
+gen_n_features = config.model_hyperparams['gen_n_features']
+
+dis_n_features = config.model_hyperparams['dis_n_features']
 
 dataset_name = config.dataset
 
@@ -65,17 +77,22 @@ mean = config.datasets_hyperparams[dataset_name]['mean']
 std = config.datasets_hyperparams[dataset_name]['std']
 
 # creating dataloaders
-obj = Data(data_path)
-train_data = obj.data
+train_data = Data(data_path, mean, std)
 data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
 print('Number of samples for train - {}'.format(len(data_loader)))
 print('Batch size - {}'.format(batch_size))
 
 # Initialize generator, discriminator and RoI generator
-generator = Generator()
-discriminator = Discriminator()
-roi = RoI(image_size, gaussian_roi, device)
+generator = Generator(gen_n_input, gen_n_features, gen_n_hidden_spade)
+discriminator = Discriminator(dis_n_features)
+roi = RoI(image_size, locals()[roi_function], device, roi_mode)
+
+if print_summary:
+    print('Generator:')
+    summary(generator, [(gen_n_input, 1, 1), (1, 64, 64)], device='cpu')
+    print('Discriminator')
+    summary(discriminator, (3, 64, 64), device='cpu')
 
 # Initialize weights
 if chkpname_dis == None and chkpname_gen == None:
@@ -108,7 +125,7 @@ if chkpdir and chkpname_dis and chkpname_gen:
     initial_epoch = state['epoch']
     num_updates = state['iter']
 
-Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() and gpu else torch.FloatTensor
 
 writer = SummaryWriter(logdir)
 trainer = Trainer(models=[generator,
@@ -135,24 +152,26 @@ for epoch in range(0, num_epochs):
     with tqdm(ascii=True, leave=False,
               total=len(data_loader), desc='Epoch {}'.format(current_epoch)) as bar:
 
-        for images in train_loader:
+        for images in data_loader:
 
             # gradient update
+
             images = images.to(device)
 
             random = Variable(Tensor(np.random.randn(batch_size, 100, 1, 1)))
             masks = roi.generate_masks(batch_size)
             masks = images * (1 - masks)
-            gen_images, loss_d, loss_g = trainer.train_step(random, masks, imgs)
+            gen_images, loss_d, loss_g = trainer.train_step(random, masks, images)
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
             train_loss_dis += loss_d.item()
 
-            bar.postfix = 'loss D - {:.5f}, loss G - {:.5f}, lr - {:.5f}'.format(
-                                                                    loss_d
+            bar.postfix = 'loss D - {:.5f}, loss G - {:.5f}, lr D - {:.7f}, lr G - {:.7f}'.format(
+                                                                    loss_d,
                                                                     loss_g,
-                                                                    lr
+                                                                    lr_dis,
+                                                                    lr_gen
                                                                    )
             bar.update()
 

@@ -6,26 +6,26 @@ from Denormalization import SPADE
 class Generator(nn.Module):
 
     def __init__(self, n_latent=100,
-                        n_feats=64):
+                        n_feats=64,
+                        n_hidden=128):
         super(Generator, self).__init__()
         self.n_latent = n_latent
         self.n_feats = n_feats
 
         self.deconv_1 = nn.ConvTranspose2d(self.n_latent, self.n_feats * 8, 4, 1, 0, bias=False)
-        self.spade_1 = SPADE(self.n_feats * 8, 3)
+        self.spade_1 = SPADE(self.n_feats * 8, 3, n_hidden)
 
         self.deconv_2 = nn.ConvTranspose2d(self.n_feats * 8, self.n_feats * 4, 4, 2, 1, bias=False)
-        self.spade_2 = SPADE(self.n_feats * 4, 3)
+        self.spade_2 = SPADE(self.n_feats * 4, 3, n_hidden)
 
         self.deconv_3 = nn.ConvTranspose2d(self.n_feats * 4, self.n_feats * 2, 4, 2, 1, bias=False)
-        self.spade_3 = SPADE(self.n_feats * 2, 3)
+        self.spade_3 = SPADE(self.n_feats * 2, 3, n_hidden)
 
         self.deconv_4 = nn.ConvTranspose2d(self.n_feats * 2, self.n_feats, 4, 2, 1, bias=False)
-        self.spade_4 = SPADE(self.n_feats, 3)
+        self.spade_4 = SPADE(self.n_feats, 3, n_hidden)
 
         self.deconv_5 = nn.ConvTranspose2d(self.n_feats, 3, 4, 2, 1, bias=False)
 
-        self.leaky_relu = nn.LeakyReLU(0.2, inplace=True)
         self.relu = nn.ReLU(inplace=True)
         self.tanh = nn.Tanh()
 
@@ -33,22 +33,18 @@ class Generator(nn.Module):
 
         z = self.deconv_1(z)
         z = self.spade_1(z, mask)
-        #z = self.leaky_relu(z)
         z = self.relu(z)
 
         z = self.deconv_2(z)
         z = self.spade_2(z, mask)
-        #z = self.leaky_relu(z)
         z = self.relu(z)
 
         z = self.deconv_3(z)
         z = self.spade_3(z, mask)
-        #z = self.leaky_relu(z)
         z = self.relu(z)
 
         z = self.deconv_4(z)
         z = self.spade_4(z, mask)
-        #z = self.leaky_relu(z)
         z = self.relu(z)
 
         z = self.deconv_5(z)

@@ -5,13 +5,12 @@ import torch.nn.functional as F
 
 class SPADE(nn.Module):
 
-    def __init__(self, n_channels, kernel_size):
+    def __init__(self, n_channels, kernel_size, n_hidden):
         super().__init__()
 
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
 
         # hidden layer
-        n_hidden = 128
         pw = kernel_size // 2
         self.dense = nn.Sequential(
             nn.Conv2d(1, n_hidden, kernel_size=kernel_size, padding=pw),
