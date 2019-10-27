@@ -8,7 +8,7 @@ class SPADE(nn.Module):
     def __init__(self, n_channels, kernel_size):
         super().__init__()
 
-        self.normalization = nn.InstanceNorm2d(n_channels, affine=False)
+        self.normalization = nn.BatchNorm2d(n_channels, affine=False)
 
         # hidden layer
         n_hidden = 128
@@ -25,6 +25,7 @@ class SPADE(nn.Module):
 
         # normalize input
         normalized = self.normalization(x)
+        mask = mask[:, 0:1, :, :]
 
         # beta and gamma generation
         mask = F.interpolate(mask, size=x.size()[2:], mode='nearest')

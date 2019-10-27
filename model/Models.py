@@ -26,28 +26,33 @@ class Generator(nn.Module):
         self.deconv_5 = nn.ConvTranspose2d(self.n_feats, 3, 4, 2, 1, bias=False)
 
         self.leaky_relu = nn.LeakyReLU(0.2, inplace=True)
-        self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU(inplace=True)
+        self.tanh = nn.Tanh()
 
     def forward(self, z, mask):
 
         z = self.deconv_1(z)
         z = self.spade_1(z, mask)
-        z = self.leaky_relu(z)
+        #z = self.leaky_relu(z)
+        z = self.relu(z)
 
         z = self.deconv_2(z)
         z = self.spade_2(z, mask)
-        z = self.leaky_relu(z)
+        #z = self.leaky_relu(z)
+        z = self.relu(z)
 
         z = self.deconv_3(z)
         z = self.spade_3(z, mask)
-        z = self.leaky_relu(z)
+        #z = self.leaky_relu(z)
+        z = self.relu(z)
 
         z = self.deconv_4(z)
         z = self.spade_4(z, mask)
-        z = self.leaky_relu(z)
+        #z = self.leaky_relu(z)
+        z = self.relu(z)
 
         z = self.deconv_5(z)
-        z = self.sigmoid(z)
+        z = self.tanh(z)
 
         return z
 

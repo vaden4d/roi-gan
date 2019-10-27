@@ -3,7 +3,8 @@ from torch.autograd import Variable
 from Losses import roi_loss
 
 class Trainer:
-    def __init__(self, models, optimizers, losses, device):
+    def __init__(self, models, optimizers, losses, clip_norm,
+        writer, num_updates, device, multi_gpu):
 
         self.device = device
 
@@ -12,12 +13,17 @@ class Trainer:
         else:
             self.gen, self.dis = models
 
+        if multi_gpu:
+            self.gen = torch.nn.DataParallel(self.gen)
+            self.dis = torch.nn.DataParallel(self.dis)
+
         self.g_optimizer, self.d_optimizer = optimizers
         self.g_loss, self.d_loss = losses
 
-        #self.clip_norm = clip_norm
-        #self.writer = writer
-        self.num_updates = 0
+        self.criterion = criterion
+        self.clip_norm = clip_norm
+        self.writer = writer
+        self.num_updates = num_updates
 
     def train_step(self, noise, masks, batch):
 
@@ -32,8 +38,9 @@ class Trainer:
 
         loss_g = self.g_loss(probs_generated)
         #loss_roi = roi_loss(masks, generated_samples, batch)
-        loss_roi = ((masks - batch)**2).mean()
-        (loss_g + loss_roi).backward()
+        #loss_roi = ((masks - batch)**2).mean()
+        #(loss_g + loss_roi).backward()
+        loss_g.backward()
         self.g_optimizer.step()
 
         # Discriminator

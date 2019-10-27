@@ -4,7 +4,19 @@ import os
 import numpy as np
 from PIL import Image
 
-import matplotlib.pyplot as plt
+ef save_model(model, optimizer, epoch, iter, chkp_dir, name):
+    state = {
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'epoch': epoch,
+        'iter': iter
+    }
+    torch.save(state, os.path.join(chkp_dir, '{}-epoch-{}.chkp'.format(name, epoch)))
+
+
+def load_model(chkp_dir, chkp_name):
+    state = torch.load(os.path.join(chkp_dir, chkp_name))
+    return state
 
 def weights_init(m, init_type='normal', gain=0.02):
     classname = m.__class__.__name__

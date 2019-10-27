@@ -109,13 +109,13 @@ if __name__ == '__main__':
     import time
     start = time.time()
     obj = Data()
-    obj.download('../cars_train')
+    obj.download('/Users/vaden4d/Documents/ds/roi-gan/cars_train')
     train_data = obj.data
     data_loader = DataLoader(train_data, batch_size=64, shuffle=True)
     print(train_data[0][0].size())
     print('Time: ', time.time() - start)
     for i, (imgs, _) in enumerate(data_loader):
+        print(imgs)
         print(imgs.size())
         if i > 2:
             break
-    #print(train_data[6])

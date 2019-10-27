@@ -10,11 +10,17 @@ class RoI:
         self.f = sampling_rule
         self.device = device
 
-    def generate_masks(self, n):
+    def generate_masks(self, n, mode='duplicate'):
 
-        masks = [torch.from_numpy(self.f(self.shape)).float() for i in range(n)]
-        masks = torch.stack(masks).to(self.device)
-        masks = masks.unsqueeze(0).permute(1, 0, 2, 3)
+        if mode == 'full':
+            masks = [torch.from_numpy(self.f(self.shape)).float() for i in range(n)]
+            masks = torch.stack(masks).to(self.device)
+            masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
+
+        elif mode == 'duplicate':
+            masks = torch.from_numpy(self.f(self.shape)).float()
+            masks = masks.unsqueeze(0).repeat(3, 1, 1)
+            masks = masks.unsqueeze(0).repeat(n, 1, 1, 1)
 
         return masks
 
@@ -137,4 +143,5 @@ if __name__ == '__main__':
     tensors = obj.generate_masks(50)
     print(tensors.size())
     print(tensors[0].max())
+    print((tensors[1] == tensors[45]).all())
     print('Time', time.time() - start)

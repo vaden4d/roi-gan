@@ -10,7 +10,9 @@ def roi_loss(masks, real, fake):
     return loss
 
 def vanilla_generator_loss(fake_outputs_probs):
-    # -log D(G(z)) -> min w.r.t G
+    # log (1 - D(G(z))) -> min w.r.t G - standard setting
+    # -log D(G(z)) -> min w.r.t G - Goodfellow recommendation
+    #loss = (1 - fake_outputs_probs).log().mean()
     loss = -fake_outputs_probs.log().mean()
     return loss
 
