@@ -64,26 +64,57 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
             spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 4, 2, 1, bias=False)),
-            nn.Dropout(0.5),
             nn.BatchNorm2d(self.n_feats * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
             spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 4, 2, 1, bias=False)),
-            nn.Dropout(0.5),
             nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
             spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 8, 4, 2, 1, bias=False)),
-            nn.Dropout(0.5),
             nn.BatchNorm2d(self.n_feats * 8),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
             spectral_norm(nn.Conv2d(self.n_feats * 8, 1, 4, 1, 0, bias=False)),
         )
+        '''
+        self.conv_1 = nn.Sequential(
+            # input is (nc) x 64 x 64
+            spectral_norm(nn.Conv2d(3, self.n_feats, 4, 2, 1, bias=False)),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.conv_2 = nn.Sequential(
+            # state size. (ndf) x 32 x 32
+            spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 4, 2, 1, bias=False)),
+            nn.BatchNorm2d(self.n_feats * 2),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.conv_3 = nn.Sequential(
+            # state size. (ndf*2) x 16 x 16
+            spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 4, 2, 1, bias=False)),
+            nn.BatchNorm2d(self.n_feats * 4),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.conv_4 = nn.Sequential(
+            # state size. (ndf*4) x 8 x 8
+            spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 8, 4, 2, 1, bias=False)),
+            nn.BatchNorm2d(self.n_feats * 8),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.conv_5 = spectral_norm(nn.Conv2d(self.n_feats * 8, 1, 4, 1, 0, bias=False))
+        '''
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+
+        # feature extraction
         x = self.net(x)
+
+        # sigmoid
         x = x.view(-1, 1)
         x = self.sigmoid(x)
         return x
@@ -100,9 +131,18 @@ if __name__ == '__main__':
 
     dis = Discriminator().cpu()
     dis.eval()
-    x = torch.randn(10, 3, 64, 64)
+    z = torch.randn(10, 3, 64, 64)
+
+    net = nn.Sequential(
+        nn.Linear(10, 20),
+        nn.Linear(20, 30)
+    )
+    print(net[0])
+    print(dis.net[3])
+    
+    '''
     y = dis(x)
     print(y.size())
     print(y)
-    print(y.size())
+    print(y.size())'''
 

@@ -32,3 +32,17 @@ def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     loss = (real_outputs_probs - 1)**2 + fake_outputs_probs**2
     loss = loss.mean()
     return loss
+
+def fe_matching_loss(fake_features, real_features):
+    # ||real_features - fake_features||**2 -> min w.r.t G
+    loss = (real_features - fake_features)**2
+    loss = loss.mean()
+    return loss
+
+def fe_matching_generator_loss(discriminator, n_first_layer, n_second_layer):
+
+    def f(fake_features, real_features):
+
+        pass
+
+    pass

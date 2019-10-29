@@ -19,7 +19,7 @@ model_hyperparams = {'clip_norm': 1e-2,
                      'gen_n_hidden_spade': 64, # spade
                      'gen_n_input': 100, # size of random vector
                      'gen_n_features': 32,  # n_features in generator
-                     'dis_n_features': 16 # n_features in discriminator
+                     'dis_n_features': 32 # n_features in discriminator
 }
 
 stabilizing_hyperparams = {'adding_noise': True}
