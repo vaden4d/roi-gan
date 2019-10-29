@@ -24,46 +24,38 @@ class Trainer:
         self.writer = writer
         self.num_updates = num_updates
 
-    def train_step(self, noise, masks, batch):
+    def train_step(self, noises, masks, batch):
 
-        self.gen.train()
-        self.dis.train()
         self.num_updates += 1
+        for _ in range(1):
+            # Discriminator
+            self.dis.train()
+            self.gen.eval()
+            self.d_optimizer.zero_grad()
+            
+            generated_samples = self.gen(noises[0], masks[0])
+            probs_fake = self.dis(generated_samples)
+            probs_real = self.dis(batch)
+
+            loss_d = self.d_loss(probs_fake, probs_real)
+            loss_d.backward()
+            self.d_optimizer.step()
 
         # Generator
+        self.gen.train()
+        self.dis.eval()
         self.g_optimizer.zero_grad()
-        generated_samples = self.gen(noise, masks)
-        probs_generated = self.dis(generated_samples)
 
-        loss_g = self.g_loss(probs_generated)
+        generated_samples = self.gen(noises[1], masks[1])
+        probs_fake = self.dis(generated_samples)
+
+        # or with detach?
+        loss_g = self.g_loss(probs_fake)
         #loss_roi = roi_loss(masks, generated_samples, batch)
         #loss_roi = ((masks - batch)**2).mean()
         #(loss_g + loss_roi).backward()
         loss_g.backward()
         self.g_optimizer.step()
-
-        # Discriminator
-        self.d_optimizer.zero_grad()
-        probs_real = self.dis(batch)
-
-        # with or without detach?
-        loss_d = self.d_loss(probs_generated.detach(), probs_real)
-        loss_d.backward()
-        self.d_optimizer.step()
-
-        return generated_samples, loss_g, loss_d
-
-    def test_step(self, noise, masks, batch):
-
-        self.gen.eval()
-        self.dis.eval()
-
-        generated_samples = self.gen(noise, masks)
-        probs_fake = self.dis(generated_samples)
-        probs_real = self.dis(batch)
-
-        loss_g = self.g_loss(probs_fake)
-        loss_d = self.d_loss(probs_fake, probs_real)
 
         return generated_samples, loss_g, loss_d
 

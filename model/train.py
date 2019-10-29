@@ -31,7 +31,7 @@ from utils.functions import weights_init, save_model, load_model
 
 from Data import Data
 from torch.utils.data import DataLoader
-from Losses import vanilla_generator_loss, vanilla_discriminator_loss
+from Losses import vanilla_generator_loss, vanilla_discriminator_loss, ls_generator_loss, ls_discriminator_loss
 from torchvision.utils import save_image
 
 from tensorboardX import SummaryWriter
@@ -75,6 +75,8 @@ image_size = config.datasets_hyperparams[dataset_name]['img_shape']
 data_path = config.datasets_hyperparams[dataset_name]['path']
 mean = config.datasets_hyperparams[dataset_name]['mean']
 std = config.datasets_hyperparams[dataset_name]['std']
+
+is_add_noise = config.stabilizing_hyperparams['adding_noise']
 
 # creating dataloaders
 train_data = Data(data_path, mean, std)
@@ -132,13 +134,19 @@ trainer = Trainer(models=[generator,
                             discriminator],
                     optimizers=[optimizer_G,
                                 optimizer_D],
-                    losses=[vanilla_generator_loss,
-                            vanilla_discriminator_loss],
+                    losses=[ls_generator_loss,
+                            ls_discriminator_loss],
                     clip_norm=clip_norm,
                     writer=writer,
                     num_updates=num_updates,
                     device=device,
                     multi_gpu=multi_gpu)
+
+# saving generated
+try:
+    os.mkdir('generated')
+except FileExistsError:
+    pass
 
 num_batches = len(data_loader)
 # train and evaluate
@@ -157,11 +165,23 @@ for epoch in range(0, num_epochs):
             # gradient update
 
             images = images.to(device)
+            if is_add_noise:
+                images += torch.randn(images.size()).to(device)
 
-            random = Variable(Tensor(np.random.randn(batch_size, 100, 1, 1)))
-            masks = roi.generate_masks(batch_size)
-            masks = images * (1 - masks)
-            gen_images, loss_d, loss_g = trainer.train_step(random, masks, images)
+            # if final batch isn't equal to defined batch size in loader
+            batch_size = images.size()[0]
+
+            random_1 = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            masks_1 = roi.generate_masks(batch_size)
+            #masks_1 = images * (1 - masks_1)
+
+            random_2 = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            masks_2 = roi.generate_masks(batch_size)
+            #masks_2 = images * (1 - masks_2)
+
+            gen_images, loss_d, loss_g = trainer.train_step([random_1, random_2], 
+                                                            [masks_1, masks_2], 
+                                                            images)
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
@@ -192,5 +212,5 @@ for epoch in range(0, num_epochs):
     save_model(trainer.dis, trainer.d_optimizer, current_epoch, trainer.num_updates, chkpdir, 'dis')
 
     if epoch % sample_interval == 0:
-
+        
         save_image(gen_images.data[:25], 'generated/%d.png' % current_epoch, nrow=5, normalize=True)

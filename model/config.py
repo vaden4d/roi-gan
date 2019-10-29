@@ -19,18 +19,20 @@ model_hyperparams = {'clip_norm': 1e-2,
                      'gen_n_hidden_spade': 64, # spade
                      'gen_n_input': 100, # size of random vector
                      'gen_n_features': 32,  # n_features in generator
-                     'dis_n_features': 32 # n_features in discriminator
+                     'dis_n_features': 16 # n_features in discriminator
 }
+
+stabilizing_hyperparams = {'adding_noise': True}
 
 # train/test hyperparameters
 train_hyperparams = {'num_epochs': 100,
                     'batch_size': 128,
-                    'sample_interval': 5
+                    'sample_interval': 2
 }
 
 # add lr-scheduling possibility
-optimizator_hyperparams = {'lr_gen': 1e-2,
-                           'lr_dis': 1e-2
+optimizator_hyperparams = {'lr_gen': 0.0001 ,
+                           'lr_dis': 0.0004 
 }
 
 # dataset constants

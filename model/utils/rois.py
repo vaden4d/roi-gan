@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from scipy.stats import multivariate_normal
+from torch.utils.data import Dataset, RandomSampler
 
 class RoI:
 
@@ -10,6 +11,11 @@ class RoI:
         self.f = sampling_rule
         self.device = device
         self.mode = mode
+
+    def sample(self):
+
+        mask = torch.from_numpy(self.f(self.shape))
+        return mask
 
     def generate_masks(self, n):
 
@@ -140,11 +146,22 @@ def mixture_roi(image_shape=(200, 200), n_gaussians=15):
 
 if __name__ == '__main__':
     import time
+    import multiprocessing as mp
+
+    pool = mp.Pool(4)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    obj = RoI((200, 200), mixture_roi, device)
+    
+    obj = RoI((64, 64), gaussian_roi, device, 'duplicate')
     start = time.time()
-    tensors = obj.generate_masks(50)
-    print(tensors.size())
-    print(tensors[0].max())
-    print((tensors[1] == tensors[45]).all())
+
+    masks = [obj.sample() for i in range(64)]
+    masks = torch.stack(masks)
+    masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
+    masks = masks.to(device)
+    print(masks)
+
+    #tensors = obj.generate_masks(64)
+
+
     print('Time', time.time() - start)
