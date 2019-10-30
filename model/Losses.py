@@ -10,15 +10,17 @@ def roi_loss(masks, real, fake):
     return loss
 
 def vanilla_generator_loss(fake_outputs_probs):
+    eps = 1e-12
     # log (1 - D(G(z))) -> min w.r.t G - standard setting
     # -log D(G(z)) -> min w.r.t G - Goodfellow recommendation
     #loss = (1 - fake_outputs_probs).log().mean()
-    loss = -fake_outputs_probs.log().mean()
+    loss = -(fake_outputs_probs + eps).log().mean()
     return loss
 
 def vanilla_discriminator_loss(fake_outputs_probs, real_outputs_probs):
+    eps = 1e-12
     # -log D(x) - log (1 - D(G(z))) -> min w.r.t D
-    loss = (1 - fake_outputs_probs).log().mean() + 0.9 * real_outputs_probs.log().mean()
+    loss = (1 - fake_outputs_probs + eps).log().mean() + 0.9 * (real_outputs_probs + eps).log().mean()
     return -loss
 
 def ls_generator_loss(fake_outputs_probs):
@@ -32,17 +34,3 @@ def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     loss = (real_outputs_probs - 1)**2 + fake_outputs_probs**2
     loss = loss.mean()
     return loss
-
-def fe_matching_loss(fake_features, real_features):
-    # ||real_features - fake_features||**2 -> min w.r.t G
-    loss = (real_features - fake_features)**2
-    loss = loss.mean()
-    return loss
-
-def fe_matching_generator_loss(discriminator, n_first_layer, n_second_layer):
-
-    def f(fake_features, real_features):
-
-        pass
-
-    pass

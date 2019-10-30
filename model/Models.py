@@ -58,6 +58,7 @@ class Discriminator(nn.Module):
     def __init__(self, n_feats=64):
         super(Discriminator, self).__init__()
         self.n_feats = n_feats
+        self.int_outputs = []
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
             spectral_norm(nn.Conv2d(3, self.n_feats, 4, 2, 1, bias=False)),
@@ -110,6 +111,9 @@ class Discriminator(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        # set to empty list with intermidiate
+        # layers
+        self.int_outputs = []
 
         # feature extraction
         x = self.net(x)
@@ -129,20 +133,27 @@ if __name__ == '__main__':
     summary(gen, [(100, 1, 1), (1, 64, 64)])
     print(y.size())'''
 
-    dis = Discriminator().cpu()
-    dis.eval()
     z = torch.randn(10, 3, 64, 64)
 
-    net = nn.Sequential(
-        nn.Linear(10, 20),
-        nn.Linear(20, 30)
-    )
-    print(net[0])
-    print(dis.net[3])
-    
-    '''
-    y = dis(x)
-    print(y.size())
-    print(y)
-    print(y.size())'''
+    dis = Discriminator().cpu()
+    dis.eval()
 
+    def hook(module, input, output):
+        dis.intermediate_outputs.append(output)
+    '''
+    dis.net[5].register_forward_hook(hook)
+    
+    out = dis(z)
+    print(z.size())
+    print(out.size())
+    print(outputs[0].size())
+    print(len(outputs))
+    print('kek')
+    out = dis(z)
+    print(z.size())
+    print(out.size())
+    print(outputs[0].size())
+    print(len(outputs))
+
+    '''
+    print(dis.net[4])

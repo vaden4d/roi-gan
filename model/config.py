@@ -12,7 +12,7 @@ train_mode = {'gpu': True,
               'multi_gpu': False
 }
 
-print_summary = True
+print_summary = False
 model_hyperparams = {'clip_norm': 1e-2,
                      'roi_mode': 'duplicate', # 'duplicate' or 'roi'
                      'function': 'gaussian_roi', # roi generation function
@@ -22,7 +22,10 @@ model_hyperparams = {'clip_norm': 1e-2,
                      'dis_n_features': 32 # n_features in discriminator
 }
 
-stabilizing_hyperparams = {'adding_noise': True}
+stabilizing_hyperparams = {'adding_noise': True,
+                            'fe_matching': True,
+                            'n_layer_fe_matching': 4
+}
 
 # train/test hyperparameters
 train_hyperparams = {'num_epochs': 100,
@@ -31,8 +34,9 @@ train_hyperparams = {'num_epochs': 100,
 }
 
 # add lr-scheduling possibility
-optimizator_hyperparams = {'lr_gen': 0.0001 ,
-                           'lr_dis': 0.0004 
+optimizator_hyperparams = {'lr_gen': 0.0001,
+                           'lr_dis': 0.0004,
+                            'loss': 'vanilla' # vanilla, ls 
 }
 
 # dataset constants

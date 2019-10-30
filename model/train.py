@@ -31,7 +31,7 @@ from utils.functions import weights_init, save_model, load_model
 
 from Data import Data
 from torch.utils.data import DataLoader
-from Losses import vanilla_generator_loss, vanilla_discriminator_loss, ls_generator_loss, ls_discriminator_loss
+from Losses import *
 from torchvision.utils import save_image
 
 from tensorboardX import SummaryWriter
@@ -56,6 +56,7 @@ sample_interval = config.train_hyperparams['sample_interval']
 
 lr_gen = config.optimizator_hyperparams['lr_gen']
 lr_dis = config.optimizator_hyperparams['lr_dis']
+loss_type = config.optimizator_hyperparams['loss']
 
 clip_norm = config.model_hyperparams['clip_norm']
 roi_mode = config.model_hyperparams['roi_mode']
@@ -77,6 +78,8 @@ mean = config.datasets_hyperparams[dataset_name]['mean']
 std = config.datasets_hyperparams[dataset_name]['std']
 
 is_add_noise = config.stabilizing_hyperparams['adding_noise']
+is_fe_matching = config.stabilizing_hyperparams['fe_matching']
+n_layer_fe_matching = config.stabilizing_hyperparams['n_layer_fe_matching']
 
 # creating dataloaders
 train_data = Data(data_path, mean, std)
@@ -127,6 +130,29 @@ if chkpdir and chkpname_dis and chkpname_gen:
     initial_epoch = state['epoch']
     num_updates = state['iter']
 
+mode = None 
+
+if loss_type == 'vanilla':
+
+    generator_loss = vanilla_generator_loss
+    discriminator_loss = vanilla_discriminator_loss
+
+elif loss_type == 'ls':
+
+    generator_loss = ls_generator_loss
+    discriminator_loss = ls_discriminator_loss
+
+else:
+
+    raise NotImplementedError
+
+if is_fe_matching:
+
+    def hook(module, input, output):
+        discriminator.int_outputs.append(output)
+
+    discriminator.net[n_layer_fe_matching].register_forward_hook(hook)
+
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() and gpu else torch.FloatTensor
 
 writer = SummaryWriter(logdir)
@@ -134,19 +160,24 @@ trainer = Trainer(models=[generator,
                             discriminator],
                     optimizers=[optimizer_G,
                                 optimizer_D],
-                    losses=[ls_generator_loss,
-                            ls_discriminator_loss],
+                    losses=[generator_loss,
+                            discriminator_loss],
                     clip_norm=clip_norm,
                     writer=writer,
                     num_updates=num_updates,
                     device=device,
-                    multi_gpu=multi_gpu)
+                    multi_gpu=multi_gpu,
+                    is_fmatch=is_fe_matching
+                    )
 
 # saving generated
 try:
     os.mkdir('generated')
 except FileExistsError:
     pass
+
+train_dis = True
+train_gen = True
 
 num_batches = len(data_loader)
 # train and evaluate
@@ -166,22 +197,26 @@ for epoch in range(0, num_epochs):
 
             images = images.to(device)
             if is_add_noise:
-                images += torch.randn(images.size()).to(device)
+                images += 0.05 * torch.randn(images.size()).to(device)
 
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
+            
+            if train_dis:
+                random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+                mask = roi.generate_masks(batch_size)
+                #mask = images * (1 - mask)
+                gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
-            random_1 = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
-            masks_1 = roi.generate_masks(batch_size)
-            #masks_1 = images * (1 - masks_1)
+            if train_gen:
+                random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+                mask = roi.generate_masks(batch_size)
+                #mask = images * (1 - mask)
 
-            random_2 = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
-            masks_2 = roi.generate_masks(batch_size)
-            #masks_2 = images * (1 - masks_2)
+                gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
-            gen_images, loss_d, loss_g = trainer.train_step([random_1, random_2], 
-                                                            [masks_1, masks_2], 
-                                                            images)
+            train_dis = loss_d * 1.5 > loss_g
+            train_gen = loss_g * 1.5 > loss_d
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
