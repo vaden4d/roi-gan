@@ -198,25 +198,29 @@ for epoch in range(0, num_epochs):
             images = images.to(device)
             if is_add_noise:
                 images += 0.05 * torch.randn(images.size()).to(device)
-
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
+            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            mask = roi.generate_masks(batch_size)
+            mask = images * (1 - mask)
+            gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
+
             if train_dis:
-                random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
-                mask = roi.generate_masks(batch_size)
-                #mask = images * (1 - mask)
-                gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
+                trainer.backward_discriminator()
+
+            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            mask = roi.generate_masks(batch_size)
+            mask = images * (1 - mask)
+
+            gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:
-                random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
-                mask = roi.generate_masks(batch_size)
-                #mask = images * (1 - mask)
-
-                gen_images, loss_g = trainer.train_step_generator(random, mask, images)
-
-            train_dis = loss_d * 1.5 > loss_g
-            train_gen = loss_g * 1.5 > loss_d
+                trainer.backward_generator()
+            
+            
+            train_gen = loss_g.item() * 1.2 > loss_d.item()
+            train_dis = loss_d.item() * 1.2 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
