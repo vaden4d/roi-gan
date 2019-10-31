@@ -24,6 +24,7 @@ model_hyperparams = {'clip_norm': 1e-2,
 
 stabilizing_hyperparams = {'adding_noise': True,
                             'fe_matching': True,
+                            'roi_loss': True,
                             'n_layer_fe_matching': 4
 }
 

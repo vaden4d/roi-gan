@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-def roi_loss(masks, real, fake):
+def roi_loss(fake, real):
     '''The loss function regulates'''
 
-    loss = (1 - masks) * fake - real
+    loss = fake - real
     loss = torch.mean(loss**2)
 
     return loss

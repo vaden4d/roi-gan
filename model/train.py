@@ -80,6 +80,7 @@ std = config.datasets_hyperparams[dataset_name]['std']
 is_add_noise = config.stabilizing_hyperparams['adding_noise']
 is_fe_matching = config.stabilizing_hyperparams['fe_matching']
 n_layer_fe_matching = config.stabilizing_hyperparams['n_layer_fe_matching']
+is_roi_loss = config.stabilizing_hyperparams['roi_loss']
 
 # creating dataloaders
 train_data = Data(data_path, mean, std)
@@ -167,7 +168,8 @@ trainer = Trainer(models=[generator,
                     num_updates=num_updates,
                     device=device,
                     multi_gpu=multi_gpu,
-                    is_fmatch=is_fe_matching
+                    is_fmatch=is_fe_matching,
+                    is_roi_loss=is_roi_loss
                     )
 
 # saving generated
@@ -217,7 +219,6 @@ for epoch in range(0, num_epochs):
 
             if train_gen:
                 trainer.backward_generator()
-            
             
             train_gen = loss_g.item() * 1.2 > loss_d.item()
             train_dis = loss_d.item() * 1.2 > loss_g.item()

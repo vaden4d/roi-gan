@@ -4,7 +4,7 @@ from Losses import roi_loss
 
 class Trainer:
     def __init__(self, models, optimizers, losses, clip_norm,
-        writer, num_updates, device, multi_gpu, is_fmatch):
+        writer, num_updates, device, multi_gpu, is_fmatch, is_roi_loss):
 
         self.device = device
 
@@ -24,6 +24,7 @@ class Trainer:
         self.writer = writer
         self.num_updates = num_updates
         self.is_fmatch = is_fmatch
+        self.is_roi_loss = is_roi_loss
 
     def train_step_discriminator(self, noise, mask, batch):
 
@@ -70,8 +71,13 @@ class Trainer:
             loss_mse = loss_mse.mean()
 
             self.loss_g += loss_mse
+        
+        if self.is_roi_loss:
 
-        #loss_roi = roi_loss(masks, generated_samples, batch)
+            loss_roi = (generated_samples - mask)**2
+            loss_roi = loss_roi.mean()
+
+            self.loss_g += loss_roi
         #loss_roi = ((masks - batch)**2).mean()
         #(loss_g + loss_roi).backward()
         #self.loss_g.backward()
