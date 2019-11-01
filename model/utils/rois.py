@@ -14,19 +14,20 @@ class RoI:
 
     def sample(self):
 
-        mask = torch.from_numpy(self.f(self.shape))
+        mask = torch.from_numpy(self.f(self.shape)).float()
+        #mask = self.f(self.shape).float()
         return mask
 
     def generate_masks(self, n):
 
         if self.mode == 'full':
-            masks = [torch.from_numpy(self.f(self.shape)).float() for i in range(n)]
+            masks = [self.sample() for i in range(n)]
             masks = torch.stack(masks)
             masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
             masks = masks.to(self.device)
 
         elif self.mode == 'duplicate':
-            masks = torch.from_numpy(self.f(self.shape)).float()
+            masks = self.sample()
             masks = masks.unsqueeze(0).repeat(3, 1, 1)
             masks = masks.unsqueeze(0).repeat(n, 1, 1, 1)
             masks = masks.to(self.device)
@@ -67,8 +68,8 @@ def gaussian_roi(image_shape=(200, 200)):
 
     ----------
     Returns:
-    output: np.ndarray, the output mask
-    '''
+    output: np.ndarray, the output mask'''
+    
 
     # generate output grid
     x, y = np.mgrid[0:image_shape[0], 0:image_shape[1]]
@@ -146,22 +147,10 @@ def mixture_roi(image_shape=(200, 200), n_gaussians=15):
 
 if __name__ == '__main__':
     import time
-    import multiprocessing as mp
-
-    pool = mp.Pool(4)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    obj = RoI((64, 64), gaussian_roi, device, 'duplicate')
+    obj = RoI((64, 64), gaussian_roi, device, 'full')
     start = time.time()
-
-    masks = [obj.sample() for i in range(64)]
-    masks = torch.stack(masks)
-    masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
-    masks = masks.to(device)
-    print(masks)
-
-    #tensors = obj.generate_masks(64)
-
-
+    tensors = obj.generate_masks(64)
     print('Time', time.time() - start)

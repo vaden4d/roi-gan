@@ -63,14 +63,17 @@ class Trainer:
         if self.is_fmatch:
             
             # get internal features from D(x) and D(G(z))
-            fake_feats = self.dis.int_outputs[0]
+            fake_feats = self.dis.int_outputs
             _ = self.dis(batch)
-            real_feats = self.dis.int_outputs[0]
+            real_feats = self.dis.int_outputs
 
-            loss_mse = (fake_feats - real_feats)**2
-            loss_mse = loss_mse.mean()
+            for fake_feat, real_feat in zip(fake_feats, real_feats):
 
-            self.loss_g += loss_mse
+                loss_mse = (fake_feat - real_feat)**2
+                loss_mse = loss_mse.mean()
+                self.loss_g += loss_mse / len(self.dis.int_outputs)
+
+            
         
         if self.is_roi_loss:
 

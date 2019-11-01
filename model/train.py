@@ -79,7 +79,7 @@ std = config.datasets_hyperparams[dataset_name]['std']
 
 is_add_noise = config.stabilizing_hyperparams['adding_noise']
 is_fe_matching = config.stabilizing_hyperparams['fe_matching']
-n_layer_fe_matching = config.stabilizing_hyperparams['n_layer_fe_matching']
+n_layers_fe_matching = config.stabilizing_hyperparams['n_layers_fe_matching']
 is_roi_loss = config.stabilizing_hyperparams['roi_loss']
 
 # creating dataloaders
@@ -128,8 +128,8 @@ if chkpdir and chkpname_dis and chkpname_gen:
     discriminator = discriminator.to(device)
     optimizer_D.load_state_dict(state_dis['optimizer'])
 
-    initial_epoch = state['epoch']
-    num_updates = state['iter']
+    initial_epoch = state_gen['epoch']
+    num_updates = state_gen['iter']
 
 mode = None 
 
@@ -152,7 +152,8 @@ if is_fe_matching:
     def hook(module, input, output):
         discriminator.int_outputs.append(output)
 
-    discriminator.net[n_layer_fe_matching].register_forward_hook(hook)
+    for idx in n_layers_fe_matching:
+        discriminator.net[idx].register_forward_hook(hook)
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() and gpu else torch.FloatTensor
 
