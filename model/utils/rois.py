@@ -23,12 +23,10 @@ class RoI:
         if self.mode == 'full':
             masks = [self.sample() for i in range(n)]
             masks = torch.stack(masks)
-            masks = masks.unsqueeze(1).repeat(1, 3, 1, 1)
             masks = masks.to(self.device)
 
         elif self.mode == 'duplicate':
             masks = self.sample()
-            masks = masks.unsqueeze(0).repeat(3, 1, 1)
             masks = masks.unsqueeze(0).repeat(n, 1, 1, 1)
             masks = masks.to(self.device)
 

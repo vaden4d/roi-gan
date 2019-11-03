@@ -36,8 +36,8 @@ class Trainer:
         self.d_optimizer.zero_grad()
             
         generated_samples = self.gen(noise, mask)
-        probs_fake = self.dis(generated_samples)
-        probs_real = self.dis(batch)
+        probs_fake = self.dis(generated_samples, mask)
+        probs_real = self.dis(batch, mask)
 
         self.loss_d = self.d_loss(probs_fake, probs_real)
         #self.loss_d.backward()
@@ -55,7 +55,7 @@ class Trainer:
         self.g_optimizer.zero_grad()
 
         generated_samples = self.gen(noise, mask)
-        probs_fake = self.dis(generated_samples)
+        probs_fake = self.dis(generated_samples, mask)
 
         # or with detach?
         self.loss_g = self.g_loss(probs_fake)
@@ -64,7 +64,7 @@ class Trainer:
             
             # get internal features from D(x) and D(G(z))
             fake_feats = self.dis.int_outputs
-            _ = self.dis(batch)
+            _ = self.dis(batch, mask)
             real_feats = self.dis.int_outputs
 
             for fake_feat, real_feat in zip(fake_feats, real_feats):
@@ -77,8 +77,8 @@ class Trainer:
         
         if self.is_roi_loss:
 
-            loss_roi = (generated_samples - mask)**2
-            loss_roi = loss_roi.mean()
+            loss_roi = ((1 - mask) * (generated_samples - batch))**2
+            loss_roi = loss_roi.mean() 
 
             self.loss_g += loss_roi
         #loss_roi = ((masks - batch)**2).mean()

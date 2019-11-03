@@ -2,17 +2,19 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 from torchsummary import summary
-from Denormalization import SPADE
+from Denormalization import DenormResBlock
+import torch.nn.functional as F
 
 class Generator(nn.Module):
 
-    def __init__(self, n_latent=100,
-                        n_feats=64,
-                        n_hidden=128):
+    def __init__(self, n_input=4,
+                        n_spade=128,
+                        kernel_size=7):
         super(Generator, self).__init__()
-        self.n_latent = n_latent
-        self.n_feats = n_feats
-
+        self.n_input = n_input
+        self.n_spade = n_spade
+        self.kernel_size = kernel_size
+        '''
         self.deconv_1 = spectral_norm(nn.ConvTranspose2d(self.n_latent, self.n_feats * 8, 4, 1, 0, bias=False))
         self.spade_1 = SPADE(self.n_feats * 8, 3, n_hidden)
 
@@ -28,10 +30,16 @@ class Generator(nn.Module):
         self.deconv_5 = spectral_norm(nn.ConvTranspose2d(self.n_feats, 3, 4, 2, 1, bias=False))
 
         self.relu = nn.ReLU(inplace=True)
-        self.tanh = nn.Tanh()
+        self.tanh = nn.Tanh()'''
 
-    def forward(self, z, mask):
+        self.resblock_1 = DenormResBlock(4, 8, self.kernel_size)
+        self.resblock_2 = DenormResBlock(8, 16, self.kernel_size)
+        self.resblock_3 = DenormResBlock(16, 32, self.kernel_size)
+        self.resblock_4 = DenormResBlock(32, 16, self.kernel_size)
+        self.resblock_5 = DenormResBlock(16, 3, self.kernel_size)
 
+    def forward(self, x, mask):
+        '''
         z = self.deconv_1(z)
         z = self.spade_1(z, mask)
         z = self.relu(z)
@@ -49,111 +57,79 @@ class Generator(nn.Module):
         z = self.relu(z)
 
         z = self.deconv_5(z)
-        z = self.tanh(z)
+        z = self.tanh(z)'''
 
-        return z
+        x = self.resblock_1(x, mask)
+        x = self.resblock_2(x, mask)
+        x = self.resblock_3(x, mask)
+        x = self.resblock_4(x, mask)
+        x = self.resblock_5(x, mask)
+        x = torch.tanh(x)
+
+        return x
 
 class Discriminator(nn.Module):
 
-    def __init__(self, n_feats=64):
+    def __init__(self, n_feats=128):
         super(Discriminator, self).__init__()
         self.n_feats = n_feats
         self.int_outputs = []
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
-            spectral_norm(nn.Conv2d(3, self.n_feats, 4, 2, 1, bias=False)),
+            spectral_norm(nn.Conv2d(4, self.n_feats // 4, 2, 2, bias=False)),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
-            spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 2),
+            spectral_norm(nn.Conv2d(self.n_feats // 4, self.n_feats // 2, 2, bias=False)),
+            nn.InstanceNorm2d(self.n_feats // 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 4),
+            spectral_norm(nn.Conv2d(self.n_feats // 2, self.n_feats, 2, 2, bias=False)),
+            nn.InstanceNorm2d(self.n_feats),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 8, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 8),
+            spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 2, 2, bias=False)),
+            nn.InstanceNorm2d(self.n_feats * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            spectral_norm(nn.Conv2d(self.n_feats * 8, 1, 4, 1, 0, bias=False)),
+            spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 2, 2, bias=False)),
+            nn.InstanceNorm2d(self.n_feats * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            
+            spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 2, 2, 2, bias=False))
         )
-        '''
-        self.conv_1 = nn.Sequential(
-            # input is (nc) x 64 x 64
-            spectral_norm(nn.Conv2d(3, self.n_feats, 4, 2, 1, bias=False)),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.conv_2 = nn.Sequential(
-            # state size. (ndf) x 32 x 32
-            spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 2),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.conv_3 = nn.Sequential(
-            # state size. (ndf*2) x 16 x 16
-            spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 4),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.conv_4 = nn.Sequential(
-            # state size. (ndf*4) x 8 x 8
-            spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 8, 4, 2, 1, bias=False)),
-            nn.BatchNorm2d(self.n_feats * 8),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.conv_5 = spectral_norm(nn.Conv2d(self.n_feats * 8, 1, 4, 1, 0, bias=False))
-        '''
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
+        
+    def forward(self, x, mask):
         # set to empty list with intermidiate
         # layers
         self.int_outputs = []
 
         # feature extraction
+        x = torch.cat([x, mask], dim=1)
         x = self.net(x)
 
         # sigmoid
+        x = x.mean(axis=1)
         x = x.view(-1, 1)
-        x = self.sigmoid(x)
+        x = torch.sigmoid(x)
+
         return x
 
 if __name__ == '__main__':
-    '''
+    
     gen = Generator()
     gen.eval()
-    x = torch.randn(10, 100, 1, 1)
+    x = torch.randn(10, 4, 4, 4)
     masks = torch.randn(10, 1, 64, 64)
     y = gen(x, masks)
-    summary(gen, [(100, 1, 1), (1, 64, 64)])
-    print(y.size())'''
-
-    z = torch.randn(10, 3, 64, 64)
+    #print(y.size())
+    #summary(gen, [(4, 4, 4), (1, 64, 64)], device='cpu')
+    
+    #z = torch.randn(10, 3, 64, 64)
+    #masks = torch.randn(10, 1, 64, 64)
+    #z = torch.stack((z, masks), axis=1)
 
     dis = Discriminator().cpu()
     dis.eval()
 
-    def hook(module, input, output):
-        dis.intermediate_outputs.append(output)
-    '''
-    dis.net[5].register_forward_hook(hook)
-    
-    out = dis(z)
-    print(z.size())
-    print(out.size())
-    print(outputs[0].size())
-    print(len(outputs))
-    print('kek')
-    out = dis(z)
-    print(z.size())
-    print(out.size())
-    print(outputs[0].size())
-    print(len(outputs))
-
-    '''
-    print(dis.net[4])
+    summary(dis, (4, 64, 64), device='cpu')
+    print(dis(torch.randn(10, 4, 64, 64)).size())

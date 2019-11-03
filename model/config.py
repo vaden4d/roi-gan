@@ -16,10 +16,10 @@ print_summary = False
 model_hyperparams = {'clip_norm': 1e-2,
                      'roi_mode': 'duplicate', # 'duplicate' or 'full'
                      'function': 'gaussian_roi', # roi generation function
-                     'gen_n_hidden_spade': 64, # spade
-                     'gen_n_input': 100, # size of random vector
-                     'gen_n_features': 32,  # n_features in generator
-                     'dis_n_features': 32 # n_features in discriminator
+                     'gen_n_input': 4, # input random resolution
+                     'gen_n_spade': 128, # spade
+                     'gen_n_kernel': 7,  # n_features in generator
+                     'dis_n_features': 128 # n_features in discriminator
 }
 
 stabilizing_hyperparams = {'adding_noise': True,
@@ -37,14 +37,14 @@ train_hyperparams = {'num_epochs': 100,
 # add lr-scheduling possibility
 optimizator_hyperparams = {'lr_gen': 0.00001,
                            'lr_dis': 0.00003,
-                            'loss': 'vanilla' # vanilla, ls 
+                            'loss': 'ls' # vanilla, ls 
 }
 
 # dataset constants
 dataset = 'CelebA'
 
-datasets_hyperparams = {'CelebA': {'mean': [0.5] * 3,
-                                    'std': [0.5] * 3,
+datasets_hyperparams = {'CelebA': {'mean': [0.5061, 0.4254, 0.3828],
+                                    'std': [0.3043, 0.2838, 0.2833],
                                     'path': 'celeba/',
                                     'img_shape': (64, 64)
                                     }

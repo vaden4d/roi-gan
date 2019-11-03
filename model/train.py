@@ -64,9 +64,9 @@ roi_function = config.model_hyperparams['function']
 
 print_summary = config.print_summary
 
-gen_n_hidden_spade = config.model_hyperparams['gen_n_hidden_spade']
 gen_n_input = config.model_hyperparams['gen_n_input']
-gen_n_features = config.model_hyperparams['gen_n_features']
+gen_n_spade = config.model_hyperparams['gen_n_spade']
+gen_n_kernel = config.model_hyperparams['gen_n_kernel']
 
 dis_n_features = config.model_hyperparams['dis_n_features']
 
@@ -90,7 +90,7 @@ print('Number of samples for train - {}'.format(len(data_loader)))
 print('Batch size - {}'.format(batch_size))
 
 # Initialize generator, discriminator and RoI generator
-generator = Generator(gen_n_input, gen_n_features, gen_n_hidden_spade)
+generator = Generator(gen_n_input, gen_n_spade, gen_n_kernel)
 discriminator = Discriminator(dis_n_features)
 roi = RoI(image_size, locals()[roi_function], device, roi_mode)
 
@@ -204,25 +204,22 @@ for epoch in range(0, num_epochs):
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
-            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
             mask = roi.generate_masks(batch_size)
-            mask = images * (1 - mask)
             gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
             if train_dis:
                 trainer.backward_discriminator()
 
-            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 1, 1)))
+            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
             mask = roi.generate_masks(batch_size)
-            mask = images * (1 - mask)
-
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_g.item() * 1.2 > loss_d.item()
-            train_dis = loss_d.item() * 1.2 > loss_g.item()
+            train_gen = loss_g.item() * 1.5 > loss_d.item()
+            train_dis = loss_d.item() * 2 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
