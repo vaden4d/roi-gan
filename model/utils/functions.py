@@ -27,7 +27,7 @@ def load_model(chkp_dir, chkp_name):
     state = torch.load(os.path.join(chkp_dir, chkp_name))
     return state
 
-def weights_init(m, init_type='normal', gain=0.02):
+def weights_init(m, init_type='xavier_uniform', gain=0.02):
     classname = m.__class__.__name__
     if classname.find('BatchNorm2d') != -1:
         if hasattr(m, 'weight') and m.weight is not None:

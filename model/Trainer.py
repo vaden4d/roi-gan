@@ -35,7 +35,7 @@ class Trainer:
         self.gen.eval()
         self.d_optimizer.zero_grad()
             
-        generated_samples = self.gen(noise, mask)
+        _, _, generated_samples = self.gen(noise, batch, mask)
         probs_fake = self.dis(generated_samples, mask)
         probs_real = self.dis(batch, mask)
 
@@ -54,11 +54,13 @@ class Trainer:
         self.dis.eval()
         self.g_optimizer.zero_grad()
 
-        generated_samples = self.gen(noise, mask)
+        mean, logvar, generated_samples = self.gen(noise, batch, mask)
         probs_fake = self.dis(generated_samples, mask)
 
         # or with detach?
         self.loss_g = self.g_loss(probs_fake)
+        # vae loss
+        self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.is_fmatch:
             
@@ -72,30 +74,26 @@ class Trainer:
                 loss_mse = (fake_feat - real_feat)**2
                 loss_mse = loss_mse.mean()
                 self.loss_g += loss_mse / len(self.dis.int_outputs)
-
-            
         
         if self.is_roi_loss:
 
             loss_roi = ((1 - mask) * (generated_samples - batch))**2
-            loss_roi = loss_roi.mean() 
+            loss_roi = 0.5 * loss_roi.mean() 
 
             self.loss_g += loss_roi
-        #loss_roi = ((masks - batch)**2).mean()
-        #(loss_g + loss_roi).backward()
-        #self.loss_g.backward()
-        #self.g_optimizer.step()
 
         return generated_samples, self.loss_g
 
     def backward_discriminator(self):
 
         self.loss_d.backward()
+        torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
         self.d_optimizer.step()
 
     def backward_generator(self):
 
         self.loss_g.backward()
+        torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 1e-2)
         self.g_optimizer.step()
     #    loss.backward()
     #    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_norm)

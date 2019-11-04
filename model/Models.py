@@ -5,68 +5,76 @@ from torchsummary import summary
 from Denormalization import DenormResBlock
 import torch.nn.functional as F
 
+class Encoder(nn.Module):
+
+    def __init__(self, n_output=128):
+        super(Encoder, self).__init__()
+
+        self.layer_1 = nn.Conv2d(3, 8, kernel_size=2, stride=2)
+        self.layer_2 = nn.Conv2d(8, 16, kernel_size=2, stride=2)
+        self.layer_3 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
+        self.layer_4 = nn.Conv2d(32, 64, kernel_size=2, stride=2)
+        self.layer_5 = nn.Conv2d(64, 128, kernel_size=2, stride=2)
+
+        self.conv_mean = nn.Conv2d(128, n_output, kernel_size=2, stride=2)
+        self.conv_logvar = nn.Conv2d(128, n_output, kernel_size=2, stride=2)
+
+
+    def forward(self, x):
+
+        x = self.layer_1(x)
+        x = F.leaky_relu(x, 0.2)
+        x = self.layer_2(x)
+        x = F.leaky_relu(x, 0.2)
+        x = self.layer_3(x)
+        x = F.leaky_relu(x, 0.2)
+        x = self.layer_4(x)
+        x = F.leaky_relu(x, 0.2)
+        x = self.layer_5(x)
+        x = F.leaky_relu(x, 0.2)
+
+        #x = x.view(x.size(0), -1)
+        #mean = self.dense_mean(x)
+        #logvar = self.dense_logvar(x)
+        mean = self.conv_mean(x)
+        logvar = self.conv_logvar(x)
+
+        return mean, logvar
+
 class Generator(nn.Module):
 
     def __init__(self, n_input=4,
                         n_spade=128,
-                        kernel_size=7):
+                        kernel_size=2):
         super(Generator, self).__init__()
         self.n_input = n_input
         self.n_spade = n_spade
         self.kernel_size = kernel_size
-        '''
-        self.deconv_1 = spectral_norm(nn.ConvTranspose2d(self.n_latent, self.n_feats * 8, 4, 1, 0, bias=False))
-        self.spade_1 = SPADE(self.n_feats * 8, 3, n_hidden)
 
-        self.deconv_2 = spectral_norm(nn.ConvTranspose2d(self.n_feats * 8, self.n_feats * 4, 4, 2, 1, bias=False))
-        self.spade_2 = SPADE(self.n_feats * 4, 3, n_hidden)
+        self.encoder = Encoder()
 
-        self.deconv_3 = spectral_norm(nn.ConvTranspose2d(self.n_feats * 4, self.n_feats * 2, 4, 2, 1, bias=False))
-        self.spade_3 = SPADE(self.n_feats * 2, 3, n_hidden)
-
-        self.deconv_4 = spectral_norm(nn.ConvTranspose2d(self.n_feats * 2, self.n_feats, 4, 2, 1, bias=False))
-        self.spade_4 = SPADE(self.n_feats, 3, n_hidden)
-
-        self.deconv_5 = spectral_norm(nn.ConvTranspose2d(self.n_feats, 3, 4, 2, 1, bias=False))
-
-        self.relu = nn.ReLU(inplace=True)
-        self.tanh = nn.Tanh()'''
-
-        self.resblock_1 = DenormResBlock(4, 8, self.kernel_size)
-        self.resblock_2 = DenormResBlock(8, 16, self.kernel_size)
-        self.resblock_3 = DenormResBlock(16, 32, self.kernel_size)
+        self.resblock_1 = DenormResBlock(128, 100, self.kernel_size)
+        self.resblock_2 = DenormResBlock(100, 64, self.kernel_size)
+        self.resblock_3 = DenormResBlock(64, 32, self.kernel_size)
         self.resblock_4 = DenormResBlock(32, 16, self.kernel_size)
-        self.resblock_5 = DenormResBlock(16, 3, self.kernel_size)
+        self.resblock_5 = DenormResBlock(16, 8, self.kernel_size)
+        self.resblock_6 = DenormResBlock(8, 3, self.kernel_size)
 
-    def forward(self, x, mask):
-        '''
-        z = self.deconv_1(z)
-        z = self.spade_1(z, mask)
-        z = self.relu(z)
 
-        z = self.deconv_2(z)
-        z = self.spade_2(z, mask)
-        z = self.relu(z)
+    def forward(self, z, x, mask):
 
-        z = self.deconv_3(z)
-        z = self.spade_3(z, mask)
-        z = self.relu(z)
-
-        z = self.deconv_4(z)
-        z = self.spade_4(z, mask)
-        z = self.relu(z)
-
-        z = self.deconv_5(z)
-        z = self.tanh(z)'''
+        mean, logvar = self.encoder(x)
+        x = z * logvar.mul(0.5).exp() + mean
 
         x = self.resblock_1(x, mask)
         x = self.resblock_2(x, mask)
         x = self.resblock_3(x, mask)
         x = self.resblock_4(x, mask)
         x = self.resblock_5(x, mask)
+        x = self.resblock_6(x, mask)
         x = torch.tanh(x)
 
-        return x
+        return mean, logvar, x
 
 class Discriminator(nn.Module):
 
@@ -76,26 +84,26 @@ class Discriminator(nn.Module):
         self.int_outputs = []
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
-            spectral_norm(nn.Conv2d(4, self.n_feats // 4, 2, 2, bias=False)),
+            nn.Conv2d(4, self.n_feats // 4, 2, 2, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
-            spectral_norm(nn.Conv2d(self.n_feats // 4, self.n_feats // 2, 2, bias=False)),
-            nn.InstanceNorm2d(self.n_feats // 2),
+            nn.Conv2d(self.n_feats // 4, self.n_feats // 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats // 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            spectral_norm(nn.Conv2d(self.n_feats // 2, self.n_feats, 2, 2, bias=False)),
-            nn.InstanceNorm2d(self.n_feats),
+            nn.Conv2d(self.n_feats // 2, self.n_feats, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            spectral_norm(nn.Conv2d(self.n_feats, self.n_feats * 2, 2, 2, bias=False)),
-            nn.InstanceNorm2d(self.n_feats * 2),
+            nn.Conv2d(self.n_feats, self.n_feats * 2, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            spectral_norm(nn.Conv2d(self.n_feats * 2, self.n_feats * 4, 2, 2, bias=False)),
-            nn.InstanceNorm2d(self.n_feats * 4),
+            nn.Conv2d(self.n_feats * 2, self.n_feats, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats),
             nn.LeakyReLU(0.2, inplace=True),
             
-            spectral_norm(nn.Conv2d(self.n_feats * 4, self.n_feats * 2, 2, 2, bias=False))
+            nn.Conv2d(self.n_feats, 1, 2, 2, bias=False)
         )
         
     def forward(self, x, mask):
@@ -108,7 +116,6 @@ class Discriminator(nn.Module):
         x = self.net(x)
 
         # sigmoid
-        x = x.mean(axis=1)
         x = x.view(-1, 1)
         x = torch.sigmoid(x)
 
@@ -118,18 +125,26 @@ if __name__ == '__main__':
     
     gen = Generator()
     gen.eval()
-    x = torch.randn(10, 4, 4, 4)
+    x = torch.randn(10, 128, 1, 1)
     masks = torch.randn(10, 1, 64, 64)
-    y = gen(x, masks)
+    #y = gen(x, masks)
     #print(y.size())
-    #summary(gen, [(4, 4, 4), (1, 64, 64)], device='cpu')
+    summary(gen, [(128, 1, 1), (1, 64, 64)], device='cpu')
     
     #z = torch.randn(10, 3, 64, 64)
     #masks = torch.randn(10, 1, 64, 64)
     #z = torch.stack((z, masks), axis=1)
 
-    dis = Discriminator().cpu()
-    dis.eval()
+    #dis = Discriminator().cpu()
+    #dis.eval()
+    #print(dis.net[5])
+    #summary(dis, [(3, 64, 64), (1, 64, 64)], device='cpu')
+    #print(dis(torch.randn(10, 3, 64, 64), torch.randn(10, 1, 64, 64)).size())
 
-    summary(dis, (4, 64, 64), device='cpu')
-    print(dis(torch.randn(10, 4, 64, 64)).size())
+    #enc = Encoder().cpu()
+    #enc.eval()
+    #print(enc.layer_1)
+
+    #x = torch.randn(10, 3, 64, 64)
+    #z = enc(x)
+    #print(z.size())

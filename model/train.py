@@ -194,7 +194,7 @@ for epoch in range(0, num_epochs):
     with tqdm(ascii=True, leave=False,
               total=len(data_loader), desc='Epoch {}'.format(current_epoch)) as bar:
 
-        for images in data_loader:
+        for i, images in enumerate(data_loader):
 
             # gradient update
 
@@ -204,22 +204,25 @@ for epoch in range(0, num_epochs):
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
-            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
+            #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
+            random = torch.randn(batch_size, gen_n_input, 1, 1).to(device)
             mask = roi.generate_masks(batch_size)
             gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
             if train_dis:
                 trainer.backward_discriminator()
 
-            random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
+            #for _ in range(2):
+            #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
+            random = torch.randn(batch_size, gen_n_input, 1, 1).to(device)
             mask = roi.generate_masks(batch_size)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_g.item() * 1.5 > loss_d.item()
-            train_dis = loss_d.item() * 2 > loss_g.item()
+            train_gen = loss_g.item() * 1.2 > loss_d.item()
+            train_dis = loss_d.item() * 1.2 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
