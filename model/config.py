@@ -22,6 +22,12 @@ model_hyperparams = {'clip_norm': 1e-2,
                      'dis_n_features': 128 # n_features in discriminator
 }
 
+gen_hyperparams = {'init_size': (8, 8),
+                    'dest_size': (64, 64),
+                    'scale': 1.5,
+                    'input_channels': 128,
+                    'kernel_size': 3}
+
 stabilizing_hyperparams = {'adding_noise': True,
                             'fe_matching': True,
                             'roi_loss': True,
@@ -36,7 +42,7 @@ train_hyperparams = {'num_epochs': 100,
 
 # add lr-scheduling possibility
 optimizator_hyperparams = {'lr_gen': 0.0001,
-                           'lr_dis': 0.0001,
+                           'lr_dis': 0.00015,
                             'loss': 'ls' # vanilla, ls 
 }
 

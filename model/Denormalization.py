@@ -9,28 +9,30 @@ class SPADE(nn.Module):
         super().__init__()
 
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
+        self.kernel_size = kernel_size
 
         # hidden layer
         #n_hidden = n_channels // 2
         n_hidden = 128
         self.shared = nn.Sequential(
-            nn.ConvTranspose2d(1, n_hidden, kernel_size=kernel_size),
+            nn.Conv2d(1, n_hidden, kernel_size=self.kernel_size),
             nn.ReLU()
         )
 
-        self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=kernel_size)
-        self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=kernel_size)
+        self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
 
     def forward(self, input):
 
         x, mask = input
-
         # normalize input
         normalized = self.normalization(x)
 
         # beta and gamma generation
-        mask = F.interpolate(mask, size=x.size()[2:], mode='nearest')
-
+        size_x = x.size()[2] + 2 * self.kernel_size - 2
+        size_y = x.size()[3] + 2 * self.kernel_size - 2
+        mask = F.interpolate(mask, size=(size_x, size_y) , mode='bilinear', align_corners=False)
+        
         activations = self.shared(mask)
         gamma = self.conv_gamma(activations)
         beta = self.conv_beta(activations)
@@ -45,10 +47,10 @@ class DenormResBlock(nn.Module):
 
     def __init__(self, input_channels, 
                         output_channels, 
-                        kernel_size=3,
-                        n_spade=128):
+                        output_size,
+                        kernel_size=3):
         super(DenormResBlock, self).__init__()
-        self.n_spade = n_spade
+        self.output_size = output_size
         self.kernel_size = kernel_size
         self.input_channels = input_channels
         self.output_channels = output_channels
@@ -75,14 +77,6 @@ class DenormResBlock(nn.Module):
                                             stride=1,
                                             bias=False)
 
-        '''# block after merging
-        self.spade_4 = SPADE(output_channels, self.kernel_size)
-        self.deconv_4 = nn.ConvTranspose2d(self.output_channels, 
-                                            self.output_channels,
-                                            2 * self.kernel_size,
-                                            stride=1,
-                                            bias=False)'''
-
     def forward(self, input):
 
         x, mask = input
@@ -102,11 +96,7 @@ class DenormResBlock(nn.Module):
         right = self.deconv_3(right)
         left = left + right
 
-        '''left = F.relu(left)
-        left = self.spade_4((left, mask))
-        left = self.deconv_4(left)'''
-
-        left = F.interpolate(left, size=(2 * x.size(2), 2 * x.size(3)), mode='bilinear', align_corners=False)
+        left = F.interpolate(left, size=self.output_size, mode='bilinear', align_corners=False)
 
         return left
 

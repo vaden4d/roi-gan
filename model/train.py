@@ -63,10 +63,13 @@ roi_mode = config.model_hyperparams['roi_mode']
 roi_function = config.model_hyperparams['function']
 
 print_summary = config.print_summary
-
+'''
 gen_n_input = config.model_hyperparams['gen_n_input']
 gen_n_spade = config.model_hyperparams['gen_n_spade']
-gen_n_kernel = config.model_hyperparams['gen_n_kernel']
+gen_n_kernel = config.model_hyperparams['gen_n_kernel']'''
+
+gen_input_channels = config.gen_hyperparams['input_channels']
+input_size = config.gen_hyperparams['init_size']
 
 dis_n_features = config.model_hyperparams['dis_n_features']
 
@@ -90,7 +93,7 @@ print('Number of samples for train - {}'.format(len(data_loader)))
 print('Batch size - {}'.format(batch_size))
 
 # Initialize generator, discriminator and RoI generator
-generator = Generator(gen_n_input, gen_n_spade, gen_n_kernel)
+generator = Generator(**config.gen_hyperparams)
 discriminator = Discriminator(dis_n_features)
 roi = RoI(image_size, locals()[roi_function], len(train_data))
 roi_loader = DataLoader(roi, batch_size=batch_size, shuffle=False, num_workers=5)
@@ -204,7 +207,7 @@ for epoch in range(0, num_epochs):
             batch_size = images.size()[0]
             
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_n_input, 4, 4).to(device)
+            random = torch.randn(batch_size, gen_input_channels, *input_size).to(device)
             #mask = roi.generate_masks(batch_size)
             gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
@@ -213,15 +216,15 @@ for epoch in range(0, num_epochs):
 
             #for _ in range(2):
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_n_input, 4, 4).to(device)
+            random = torch.randn(batch_size, gen_input_channels, *input_size).to(device)
             #mask = roi.generate_masks(batch_size)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_g.item() * 1.2 > loss_d.item()
-            train_dis = loss_d.item() * 1.2 > loss_g.item()
+            train_gen = loss_g.item() * 1.5 > loss_d.item()
+            train_dis = loss_d.item() * 1.5 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
