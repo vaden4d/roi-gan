@@ -21,7 +21,9 @@ class SPADE(nn.Module):
         self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=kernel_size)
         self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=kernel_size)
 
-    def forward(self, x, mask):
+    def forward(self, input):
+
+        x, mask = input
 
         # normalize input
         normalized = self.normalization(x)
@@ -53,13 +55,13 @@ class DenormResBlock(nn.Module):
 
         # left branch
         self.spade_1 = SPADE(input_channels, self.kernel_size)
-        self.deconv_1 = nn.ConvTranspose2d(self.input_channels, 
+        self.deconv_1 = nn.Conv2d(self.input_channels, 
                                             self.output_channels,
                                             self.kernel_size,
                                             stride=1,
                                             bias=False)
         self.spade_2 = SPADE(output_channels, self.kernel_size)
-        self.deconv_2 = nn.ConvTranspose2d(self.output_channels, 
+        self.deconv_2 = nn.Conv2d(self.output_channels, 
                                             self.output_channels,
                                             self.kernel_size,
                                             stride=1,
@@ -67,49 +69,57 @@ class DenormResBlock(nn.Module):
 
         # right branch
         self.spade_3 = SPADE(input_channels, self.kernel_size)
-        self.deconv_3 = nn.ConvTranspose2d(self.input_channels, 
+        self.deconv_3 = nn.Conv2d(self.input_channels, 
                                             self.output_channels,
-                                            self.kernel_size,
-                                            stride=2,
+                                            2 * self.kernel_size - 1,
+                                            stride=1,
                                             bias=False)
 
-                                            # (H0-1)2 + k
-                                            # H0 + H0 - k - 2
-                                            # H0 + 2 (H0 // 2 - k // 2 - 1)
-                                            # H0 + 2 ( (H0 - k) // 2 - 1 ) 
+        '''# block after merging
+        self.spade_4 = SPADE(output_channels, self.kernel_size)
+        self.deconv_4 = nn.ConvTranspose2d(self.output_channels, 
+                                            self.output_channels,
+                                            2 * self.kernel_size,
+                                            stride=1,
+                                            bias=False)'''
 
-                                            # H0 + 2(k - 1) 
+    def forward(self, input):
 
-    def forward(self, x, mask):
+        x, mask = input
 
         # left branch
-        left = self.spade_1(x, mask)
+        left = self.spade_1(input)
         left = F.relu(left)
         left = self.deconv_1(left)
         
-        left = self.spade_2(left, mask)
+        left = self.spade_2((left, mask))
         left = F.relu(left)
         left = self.deconv_2(left)
 
         # right branch
-        right = self.spade_3(x, mask)
+        right = self.spade_3(input)
         right = F.relu(right)
         right = self.deconv_3(right)
+        left = left + right
 
-        left = F.interpolate(left, size=right.size()[2:], mode='bilinear', align_corners=False)
+        '''left = F.relu(left)
+        left = self.spade_4((left, mask))
+        left = self.deconv_4(left)'''
 
-        return left + right
+        left = F.interpolate(left, size=(2 * x.size(2), 2 * x.size(3)), mode='bilinear', align_corners=False)
+
+        return left
 
 if __name__ == '__main__':
     '''
     x = torch.randn(10, 5, 30, 30)
     mask = torch.randn(10, 1, 13, 13)
     obj = SPADE(5, 3, 128)
-    z = obj(x, mask)
+    z = obj((x, mask))
     print(z.size())'''
 
     x = torch.randn(100, 128, 1, 1)
     mask = torch.randn(100, 1, 64, 64)
     obj = DenormResBlock(128, 100, 2)
-    z = obj(x, mask)
+    z = obj((x, mask))
     print(z.size())

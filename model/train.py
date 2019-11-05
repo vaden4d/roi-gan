@@ -84,7 +84,7 @@ is_roi_loss = config.stabilizing_hyperparams['roi_loss']
 
 # creating dataloaders
 train_data = Data(data_path, mean, std)
-data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=5)
 
 print('Number of samples for train - {}'.format(len(data_loader)))
 print('Batch size - {}'.format(batch_size))
@@ -92,7 +92,8 @@ print('Batch size - {}'.format(batch_size))
 # Initialize generator, discriminator and RoI generator
 generator = Generator(gen_n_input, gen_n_spade, gen_n_kernel)
 discriminator = Discriminator(dis_n_features)
-roi = RoI(image_size, locals()[roi_function], device, roi_mode)
+roi = RoI(image_size, locals()[roi_function], len(train_data))
+roi_loader = DataLoader(roi, batch_size=batch_size, shuffle=False, num_workers=5)
 
 if print_summary:
     print('Generator:')
@@ -155,8 +156,6 @@ if is_fe_matching:
     for idx in n_layers_fe_matching:
         discriminator.net[idx].register_forward_hook(hook)
 
-Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() and gpu else torch.FloatTensor
-
 writer = SummaryWriter(logdir)
 trainer = Trainer(models=[generator,
                             discriminator],
@@ -194,19 +193,19 @@ for epoch in range(0, num_epochs):
     with tqdm(ascii=True, leave=False,
               total=len(data_loader), desc='Epoch {}'.format(current_epoch)) as bar:
 
-        for i, images in enumerate(data_loader):
-
-            # gradient update
+        for mask, images in zip(roi_loader, data_loader):
 
             images = images.to(device)
+            mask = mask.unsqueeze(1).to(device)
+
             if is_add_noise:
                 images += 0.05 * torch.randn(images.size()).to(device)
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_n_input, 1, 1).to(device)
-            mask = roi.generate_masks(batch_size)
+            random = torch.randn(batch_size, gen_n_input, 4, 4).to(device)
+            #mask = roi.generate_masks(batch_size)
             gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
             if train_dis:
@@ -214,8 +213,8 @@ for epoch in range(0, num_epochs):
 
             #for _ in range(2):
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_n_input, 1, 1).to(device)
-            mask = roi.generate_masks(batch_size)
+            random = torch.randn(batch_size, gen_n_input, 4, 4).to(device)
+            #mask = roi.generate_masks(batch_size)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:

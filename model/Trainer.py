@@ -9,7 +9,9 @@ class Trainer:
         self.device = device
 
         if self.device.type == 'cuda':
-            self.gen, self.dis = models[0].cuda(), models[1].cuda()
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.enabled = True
+            self.gen, self.dis = models[0].to(self.device), models[1].to(self.device)
         else:
             self.gen, self.dis = models
 
@@ -35,9 +37,9 @@ class Trainer:
         self.gen.eval()
         self.d_optimizer.zero_grad()
             
-        _, _, generated_samples = self.gen(noise, batch, mask)
-        probs_fake = self.dis(generated_samples, mask)
-        probs_real = self.dis(batch, mask)
+        _, _, generated_samples = self.gen((noise, batch, mask))
+        probs_fake = self.dis((generated_samples, mask))
+        probs_real = self.dis((batch, mask))
 
         self.loss_d = self.d_loss(probs_fake, probs_real)
         #self.loss_d.backward()
@@ -54,8 +56,8 @@ class Trainer:
         self.dis.eval()
         self.g_optimizer.zero_grad()
 
-        mean, logvar, generated_samples = self.gen(noise, batch, mask)
-        probs_fake = self.dis(generated_samples, mask)
+        mean, logvar, generated_samples = self.gen((noise, batch, mask))
+        probs_fake = self.dis((generated_samples, mask))
 
         # or with detach?
         self.loss_g = self.g_loss(probs_fake)
@@ -66,19 +68,19 @@ class Trainer:
             
             # get internal features from D(x) and D(G(z))
             fake_feats = self.dis.int_outputs
-            _ = self.dis(batch, mask)
+            _ = self.dis((batch, mask))
             real_feats = self.dis.int_outputs
 
             for fake_feat, real_feat in zip(fake_feats, real_feats):
 
                 loss_mse = (fake_feat - real_feat)**2
                 loss_mse = loss_mse.mean()
-                self.loss_g += loss_mse / len(self.dis.int_outputs)
+                self.loss_g += loss_mse 
         
         if self.is_roi_loss:
 
             loss_roi = ((1 - mask) * (generated_samples - batch))**2
-            loss_roi = 0.5 * loss_roi.mean() 
+            loss_roi = 2 * loss_roi.mean() 
 
             self.loss_g += loss_roi
 
@@ -87,13 +89,13 @@ class Trainer:
     def backward_discriminator(self):
 
         self.loss_d.backward()
-        torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
+        #torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
         self.d_optimizer.step()
 
     def backward_generator(self):
 
         self.loss_g.backward()
-        torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 1e-2)
+        #torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 1e-2)
         self.g_optimizer.step()
     #    loss.backward()
     #    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_norm)

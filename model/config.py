@@ -8,7 +8,7 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '0',
+              'gpu_devices': '1',
               'multi_gpu': False
 }
 

@@ -7,17 +7,21 @@ import torch.nn.functional as F
 
 class Encoder(nn.Module):
 
-    def __init__(self, n_output=128):
+    def __init__(self, n_output=2048):
         super(Encoder, self).__init__()
 
-        self.layer_1 = nn.Conv2d(3, 8, kernel_size=2, stride=2)
-        self.layer_2 = nn.Conv2d(8, 16, kernel_size=2, stride=2)
-        self.layer_3 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
-        self.layer_4 = nn.Conv2d(32, 64, kernel_size=2, stride=2)
-        self.layer_5 = nn.Conv2d(64, 128, kernel_size=2, stride=2)
+        self.layer_1 = nn.Conv2d(3, 16, kernel_size=2, stride=2, bias=False)
+        self.layer_2 = nn.Conv2d(16, 32, kernel_size=2, stride=2, bias=False)
+        self.layer_3 = nn.Conv2d(32, 64, kernel_size=2, stride=2, bias=False)
+        #self.layer_4 = nn.Conv2d(256, 512, kernel_size=2, stride=2, bias=False)
 
-        self.conv_mean = nn.Conv2d(128, n_output, kernel_size=2, stride=2)
-        self.conv_logvar = nn.Conv2d(128, n_output, kernel_size=2, stride=2)
+        #self.layer_5 = nn.Conv2d(512, 1024, kernel_size=2, stride=2, bias=False)
+
+        self.conv_mean = nn.Conv2d(64, 128, kernel_size=2, stride=2, bias=False)
+        self.conv_logvar = nn.Conv2d(64, 128, kernel_size=2, stride=2, bias=False)
+
+        #self.dense_mean = nn.Linear(256, n_output)
+        #self.dense_logvar = nn.Linear(256, n_output)
 
 
     def forward(self, x):
@@ -28,10 +32,12 @@ class Encoder(nn.Module):
         x = F.leaky_relu(x, 0.2)
         x = self.layer_3(x)
         x = F.leaky_relu(x, 0.2)
-        x = self.layer_4(x)
-        x = F.leaky_relu(x, 0.2)
-        x = self.layer_5(x)
-        x = F.leaky_relu(x, 0.2)
+        #x = self.layer_4(x)
+        #x = F.leaky_relu(x, 0.2)
+        #x = self.layer_5(x)
+        #x = F.leaky_relu(x, 0.2)
+        #x = self.layer_6(x)
+        #x = F.leaky_relu(x, 0.2)
 
         #x = x.view(x.size(0), -1)
         #mean = self.dense_mean(x)
@@ -56,22 +62,27 @@ class Generator(nn.Module):
         self.resblock_1 = DenormResBlock(128, 100, self.kernel_size)
         self.resblock_2 = DenormResBlock(100, 64, self.kernel_size)
         self.resblock_3 = DenormResBlock(64, 32, self.kernel_size)
-        self.resblock_4 = DenormResBlock(32, 16, self.kernel_size)
-        self.resblock_5 = DenormResBlock(16, 8, self.kernel_size)
-        self.resblock_6 = DenormResBlock(8, 3, self.kernel_size)
+        self.resblock_4 = DenormResBlock(32, 3, self.kernel_size)
+        #self.resblock_5 = DenormResBlock(16, 8, self.kernel_size)
+        #self.resblock_6 = DenormResBlock(8, 3, self.kernel_size)
 
 
-    def forward(self, z, x, mask):
+    def forward(self, input):
+
+        z, x, mask = input
 
         mean, logvar = self.encoder(x)
         x = z * logvar.mul(0.5).exp() + mean
 
-        x = self.resblock_1(x, mask)
-        x = self.resblock_2(x, mask)
-        x = self.resblock_3(x, mask)
-        x = self.resblock_4(x, mask)
-        x = self.resblock_5(x, mask)
-        x = self.resblock_6(x, mask)
+        x = self.resblock_1((x, mask))
+        x = F.leaky_relu(x, 0.2)
+        x = self.resblock_2((x, mask))
+        x = F.leaky_relu(x, 0.2)
+        x = self.resblock_3((x, mask))
+        x = F.leaky_relu(x, 0.2)
+        x = self.resblock_4((x, mask))
+        #x = self.resblock_5((x, mask))
+        #x = self.resblock_6((x, mask))
         x = torch.tanh(x)
 
         return mean, logvar, x
@@ -84,29 +95,30 @@ class Discriminator(nn.Module):
         self.int_outputs = []
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
-            nn.Conv2d(4, self.n_feats // 4, 2, 2, bias=False),
+            nn.Conv2d(4, 2 * self.n_feats, 2, 2, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
-            nn.Conv2d(self.n_feats // 4, self.n_feats // 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats // 2),
+            nn.Conv2d(self.n_feats * 2, self.n_feats , 2, bias=False),
+            nn.BatchNorm2d(self.n_feats),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(self.n_feats // 2, self.n_feats, 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats),
+            nn.Conv2d(self.n_feats, self.n_feats // 2, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats // 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(self.n_feats, self.n_feats * 2, 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats * 2),
+            nn.Conv2d(self.n_feats // 2, self.n_feats // 4, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats // 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(self.n_feats * 2, self.n_feats, 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats),
+            nn.Conv2d(self.n_feats // 4, self.n_feats // 8, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats // 8),
             nn.LeakyReLU(0.2, inplace=True),
             
-            nn.Conv2d(self.n_feats, 1, 2, 2, bias=False)
+            nn.Conv2d(self.n_feats // 8, 1, 2, 2, bias=False)
         )
         
-    def forward(self, x, mask):
+    def forward(self, input):
+        x, mask = input
         # set to empty list with intermidiate
         # layers
         self.int_outputs = []

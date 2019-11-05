@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 from scipy.stats import multivariate_normal
-from torch.utils.data import Dataset, RandomSampler
+from torch.utils.data import Dataset
 
-class RoI:
+class RoI2:
 
     def __init__(self, image_shape, sampling_rule, device, mode):
 
@@ -31,6 +31,23 @@ class RoI:
             masks = masks.to(self.device)
 
         return masks
+
+class RoI(Dataset):
+
+    def __init__(self, image_shape, sampling_rule, size):
+
+        self.shape = image_shape
+        self.f = sampling_rule
+        self.size = size
+
+    def __getitem__(self, idx):
+
+        mask = torch.from_numpy(self.f(self.shape)).float()
+        return mask
+
+    def __len__(self):
+
+        return self.size
 
 def squared_roi(image_shape=(64, 64), n_squares=1):
     '''Rectangual regions of interest (RoIs) generator
