@@ -34,3 +34,67 @@ def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     loss = (real_outputs_probs - 1)**2 + fake_outputs_probs**2
     loss = loss.mean()
     return loss
+
+class DiscriminatorLoss(nn.Module):
+
+    def __init__(self, **kwargs):
+        super(DiscriminatorLoss, self).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if self.loss == 'ls':
+            self.loss_func = ls_discriminator_loss
+        elif self.loss == 'vanilla':
+            self.loss_func = vanilla_discriminator_loss
+        else:
+            raise NotImplementedError
+
+    def forward(self, fakes, reals):
+
+        loss = self.loss_func(fakes, reals)
+        
+        return loss
+
+class GeneratorLoss(nn.Module):
+
+    def __init__(self, **kwargs):
+        super(GeneratorLoss, self).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if self.loss == 'vanilla':
+            self.loss_func = vanilla_generator_loss
+        elif self.loss == 'ls':
+            self.loss_func = ls_generator_loss
+        else:
+            raise NotImplementedError
+
+    def forward(self, fakes):
+        loss = self.loss_func(fakes)
+        return loss
+
+'''
+class FeatureMatching(nn.Module):
+
+    def __init__(self):
+        super(FeatureMatching, self).__init__()
+    
+    def forward(self, x, y):'''
+
+class FeatureMatching(nn.Module):
+
+    def __init__(self):
+        super(FeatureMatching, self).__init__()
+
+    def forward(self, x, y):
+
+        assert type(x) == type(y)
+        assert len(x) == len(y)
+        
+        loss = 0
+
+        for tensor_x, tensor_y in zip(x, y):
+
+            loss += ((tensor_x - tensor_y)**2).mean()
+
+        return loss

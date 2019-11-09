@@ -8,17 +8,13 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '1',
-              'multi_gpu': False
+              'gpu_devices': '0,1',
+              'multi_gpu': True
 }
 
 print_summary = False
 model_hyperparams = {'clip_norm': 1e-2,
-                     'roi_mode': 'duplicate', # 'duplicate' or 'full'
                      'function': 'gaussian_roi', # roi generation function
-                     'gen_n_input': 128, # input random resolution
-                     'gen_n_spade': 128, # spade
-                     'gen_n_kernel': 2,  # n_features in generator
                      'dis_n_features': 128 # n_features in discriminator
 }
 
@@ -26,12 +22,20 @@ gen_hyperparams = {'init_size': (8, 8),
                     'dest_size': (64, 64),
                     'scale': 1.5,
                     'input_channels': 128,
-                    'kernel_size': 3}
+                    'kernel_size': 3
+}
 
-stabilizing_hyperparams = {'adding_noise': True,
-                            'fe_matching': True,
-                            'roi_loss': True,
-                            'n_layers_fe_matching': [0, 2, 5, 8]
+stabilizing_hyperparams = {'adding_noise': True
+}
+
+discriminator_stabilizing_hyperparams = {'fe_matching': True,
+                                         'n_layers_fe_matching': [1],
+                                         'loss': 'ls' # 'ls' or 'vanilla'
+}
+
+generator_stabilizing_hyperparams = {'roi_loss': True,
+                                     'vae_loss': True,
+                                     'loss': 'ls' # 'ls' or 'vanilla'
 }
 
 # train/test hyperparameters
@@ -43,7 +47,6 @@ train_hyperparams = {'num_epochs': 100,
 # add lr-scheduling possibility
 optimizator_hyperparams = {'lr_gen': 0.0001,
                            'lr_dis': 0.00015,
-                            'loss': 'ls' # vanilla, ls 
 }
 
 # dataset constants

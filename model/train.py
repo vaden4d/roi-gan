@@ -31,7 +31,7 @@ from utils.functions import weights_init, save_model, load_model
 
 from Data import Data
 from torch.utils.data import DataLoader
-from Losses import *
+from Losses import GeneratorLoss, DiscriminatorLoss
 from torchvision.utils import save_image
 
 from tensorboardX import SummaryWriter
@@ -56,17 +56,12 @@ sample_interval = config.train_hyperparams['sample_interval']
 
 lr_gen = config.optimizator_hyperparams['lr_gen']
 lr_dis = config.optimizator_hyperparams['lr_dis']
-loss_type = config.optimizator_hyperparams['loss']
+#loss_type = config.optimizator_hyperparams['loss']
 
 clip_norm = config.model_hyperparams['clip_norm']
-roi_mode = config.model_hyperparams['roi_mode']
 roi_function = config.model_hyperparams['function']
 
 print_summary = config.print_summary
-'''
-gen_n_input = config.model_hyperparams['gen_n_input']
-gen_n_spade = config.model_hyperparams['gen_n_spade']
-gen_n_kernel = config.model_hyperparams['gen_n_kernel']'''
 
 gen_input_channels = config.gen_hyperparams['input_channels']
 input_size = config.gen_hyperparams['init_size']
@@ -81,9 +76,10 @@ mean = config.datasets_hyperparams[dataset_name]['mean']
 std = config.datasets_hyperparams[dataset_name]['std']
 
 is_add_noise = config.stabilizing_hyperparams['adding_noise']
-is_fe_matching = config.stabilizing_hyperparams['fe_matching']
-n_layers_fe_matching = config.stabilizing_hyperparams['n_layers_fe_matching']
-is_roi_loss = config.stabilizing_hyperparams['roi_loss']
+
+is_fe_matching = config.discriminator_stabilizing_hyperparams['fe_matching']
+n_layers_fe_matching = config.discriminator_stabilizing_hyperparams['n_layers_fe_matching']
+is_roi_loss = config.generator_stabilizing_hyperparams['roi_loss']
 
 # creating dataloaders
 train_data = Data(data_path, mean, std)
@@ -135,8 +131,12 @@ if chkpdir and chkpname_dis and chkpname_gen:
     initial_epoch = state_gen['epoch']
     num_updates = state_gen['iter']
 
-mode = None 
+generator_loss_hyperparams = config.generator_stabilizing_hyperparams
+discriminator_loss_hyperparams = config.discriminator_stabilizing_hyperparams
 
+generator_loss = GeneratorLoss(**generator_loss_hyperparams)
+discriminator_loss = DiscriminatorLoss(**discriminator_loss_hyperparams)
+'''
 if loss_type == 'vanilla':
 
     generator_loss = vanilla_generator_loss
@@ -150,14 +150,15 @@ elif loss_type == 'ls':
 else:
 
     raise NotImplementedError
-
+'''
+'''
 if is_fe_matching:
 
     def hook(module, input, output):
         discriminator.int_outputs.append(output)
 
     for idx in n_layers_fe_matching:
-        discriminator.net[idx].register_forward_hook(hook)
+        discriminator.net[idx].register_forward_hook(hook)'''
 
 writer = SummaryWriter(logdir)
 trainer = Trainer(models=[generator,
@@ -172,6 +173,7 @@ trainer = Trainer(models=[generator,
                     device=device,
                     multi_gpu=multi_gpu,
                     is_fmatch=is_fe_matching,
+                    n_layers_fe_matching=n_layers_fe_matching,
                     is_roi_loss=is_roi_loss
                     )
 

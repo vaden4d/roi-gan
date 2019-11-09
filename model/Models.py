@@ -28,9 +28,9 @@ class Encoder(nn.Module):
     def forward(self, x):
 
         x = self.layer_1(x)
-        x = F.leaky_relu(x, 0.2)
+        x = F.leaky_relu(x, 0.2, inplace=True)
         x = self.layer_2(x)
-        x = F.leaky_relu(x, 0.2)
+        x = F.leaky_relu(x, 0.2, inplace=True)
         #x = self.layer_3(x)
         #x = F.leaky_relu(x, 0.2)
         #x = self.layer_4(x)
@@ -106,7 +106,7 @@ class Generator(nn.Module):
 
             x = getattr(self, name)((x, mask))
             if x.size(1) != 3:
-                x = F.leaky_relu(x, 0.2)
+                x = F.leaky_relu(x, 0.2, inplace=True)
             else:
                 x = torch.tanh(x)
 
@@ -117,7 +117,6 @@ class Discriminator(nn.Module):
     def __init__(self, n_feats=128):
         super(Discriminator, self).__init__()
         self.n_feats = n_feats
-        self.int_outputs = []
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(4, 2 * self.n_feats, 2, 2, bias=False),
@@ -141,17 +140,36 @@ class Discriminator(nn.Module):
             
             nn.Conv2d(self.n_feats // 8, 1, 2, 2, bias=False)
         )
+        '''
+        self.net = nn.Sequential(
+
+            DenormResBlock(4, 32, (32, 32)),
+
+            DenormResBlock(32, 64, (16, 16)),
+
+            DenormResBlock(64, 128, (8, 8)),
+
+            DenormResBlock(128, 1, (4, 4)),
+
+        )
+
+        self.pooling = nn.AvgPool2d(kernel_size=2, stride=2)'''
         
     def forward(self, input):
         x, mask = input
         # set to empty list with intermidiate
         # layers
-        self.int_outputs = []
-
+        #self.int_outputs = []
         # feature extraction
         x = torch.cat([x, mask], dim=1)
         x = self.net(x)
+        #for module in self.net:
+        #
+        #    x = module((x, mask))
+        #    x = F.leaky_relu(x, 0.2, inplace=True)
 
+        #x = self.net((x, mask))
+        #x = self.pooling(x)
         # sigmoid
         x = x.view(-1, 1)
         x = torch.sigmoid(x)

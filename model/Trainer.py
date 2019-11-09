@@ -1,12 +1,15 @@
 import torch
 from torch.autograd import Variable
-from Losses import roi_loss
+from Losses import roi_loss, FeatureMatching
+from torch.nn.parallel.scatter_gather import gather
 
 class Trainer:
     def __init__(self, models, optimizers, losses, clip_norm,
-        writer, num_updates, device, multi_gpu, is_fmatch, is_roi_loss):
+        writer, num_updates, device, multi_gpu, is_fmatch, n_layers_fe_matching, is_roi_loss):
 
         self.device = device
+        self.multi_gpu = multi_gpu
+        self.n_layers_fe_matching = n_layers_fe_matching
 
         if self.device.type == 'cuda':
             torch.backends.cudnn.benchmark = True
@@ -15,7 +18,7 @@ class Trainer:
         else:
             self.gen, self.dis = models
 
-        if multi_gpu:
+        if self.multi_gpu:
             self.gen = torch.nn.DataParallel(self.gen)
             self.dis = torch.nn.DataParallel(self.dis)
 
@@ -28,6 +31,29 @@ class Trainer:
         self.is_fmatch = is_fmatch
         self.is_roi_loss = is_roi_loss
 
+        self.n_devices = torch.cuda.device_count()
+
+        if self.is_fmatch:
+
+            self.fe_loss = FeatureMatching()
+            self.extract_features = False
+
+            for idx in self.n_layers_fe_matching:
+                    
+                name = 'temporary_{}'.format(str(idx))
+                setattr(self, name, [])
+
+                def hook(module, input, output):
+                    if self.extract_features:
+                        getattr(self, name).append(output)
+                    else:
+                        pass
+
+                if self.multi_gpu:
+                    self.dis.module.net[idx].register_forward_hook(hook)
+                else:
+                    self.dis.net[idx].register_forward_hook(hook)
+
     def train_step_discriminator(self, noise, mask, batch):
 
         self.num_updates += 0.5
@@ -36,6 +62,8 @@ class Trainer:
         self.dis.train()
         self.gen.eval()
         self.d_optimizer.zero_grad()
+
+        self.extract_features = False
             
         _, _, generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
@@ -56,6 +84,8 @@ class Trainer:
         self.dis.eval()
         self.g_optimizer.zero_grad()
 
+        self.extract_features = False
+
         mean, logvar, generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
 
@@ -65,24 +95,66 @@ class Trainer:
         self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.is_fmatch:
-            
+
+            self.extract_features = True
             # get internal features from D(x) and D(G(z))
-            fake_feats = self.dis.int_outputs
+
+            # initialize feats
+            fake_feats = []
+            real_feats = []
+
+            # clear temporary variables
+            for idx in self.n_layers_fe_matching:
+                name = 'temporary_{}'.format(str(idx))
+                setattr(self, name, [])
+
+            # inference on the real batch
             _ = self.dis((batch, mask))
-            real_feats = self.dis.int_outputs
 
-            for fake_feat, real_feat in zip(fake_feats, real_feats):
+            # collect all intermidiate variables
+            # per one layer for real batch
+            for idx in self.n_layers_fe_matching:
+                name = 'temporary_{}'.format(str(idx))
+                if self.multi_gpu:
+                    real_feats.append(gather(getattr(self, name), 0, 0))
+                else:
+                    real_feats.append(getattr(self, name)[0])
 
-                loss_mse = (fake_feat - real_feat)**2
-                loss_mse = loss_mse.mean()
-                self.loss_g += loss_mse 
-        
+            # clear temporary variables
+            for idx in self.n_layers_fe_matching:
+                name = 'temporary_{}'.format(str(idx))
+                setattr(self, name, [])
+
+            # inference on the fake batch
+            _ = self.dis((generated_samples, mask))
+
+            # collect all intermidiate variables
+            # per one layer for fake batch
+            for idx in self.n_layers_fe_matching:
+                name = 'temporary_{}'.format(str(idx))
+                if self.multi_gpu:
+                    fake_feats.append(gather(getattr(self, name), 0, 0))
+                else:
+                    fake_feats.append(getattr(self, name)[0])
+
+            # clear all
+            for idx in self.n_layers_fe_matching:
+                name = 'temporary_{}'.format(str(idx))
+                setattr(self, name, [])
+
+            self.loss_g += self.fe_loss(fake_feats, real_feats)
+
         if self.is_roi_loss:
 
             loss_roi = ((1 - mask) * (generated_samples - batch))**2
             loss_roi = 2 * loss_roi.mean() 
 
             self.loss_g += loss_roi
+
+            loss_int = (mask * (generated_samples - batch))**2
+            loss_int = 2 * loss_int.mean()
+
+            self.loss_g += loss_int
 
         return generated_samples, self.loss_g
 

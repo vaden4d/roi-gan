@@ -5,11 +5,12 @@ import torch.nn.functional as F
 
 class SPADE(nn.Module):
 
-    def __init__(self, n_channels, kernel_size):
+    def __init__(self, n_channels, kernel_size, n_hidden):
         super().__init__()
 
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
         self.kernel_size = kernel_size
+        self.n_hidden = n_hidden
 
         # hidden layer
         #n_hidden = n_channels // 2
@@ -56,13 +57,14 @@ class DenormResBlock(nn.Module):
         self.output_channels = output_channels
 
         # left branch
-        self.spade_1 = SPADE(input_channels, self.kernel_size)
+        self.n_hidden = (self.input_channels + self.output_channels) // 2
+        self.spade_1 = SPADE(input_channels, self.kernel_size, self.n_hidden)
         self.deconv_1 = nn.Conv2d(self.input_channels, 
                                             self.output_channels,
                                             self.kernel_size,
                                             stride=1,
                                             bias=False)
-        self.spade_2 = SPADE(output_channels, self.kernel_size)
+        self.spade_2 = SPADE(output_channels, self.kernel_size, self.n_hidden)
         self.deconv_2 = nn.Conv2d(self.output_channels, 
                                             self.output_channels,
                                             self.kernel_size,
@@ -70,7 +72,7 @@ class DenormResBlock(nn.Module):
                                             bias=False)
 
         # right branch
-        self.spade_3 = SPADE(input_channels, self.kernel_size)
+        self.spade_3 = SPADE(input_channels, self.kernel_size, self.n_hidden)
         self.deconv_3 = nn.Conv2d(self.input_channels, 
                                             self.output_channels,
                                             2 * self.kernel_size - 1,
@@ -82,17 +84,17 @@ class DenormResBlock(nn.Module):
         x, mask = input
 
         # left branch
-        left = self.spade_1(input)
-        left = F.relu(left)
+        left = self.spade_1((x, mask))
+        left = F.relu(left, inplace=True)
         left = self.deconv_1(left)
         
         left = self.spade_2((left, mask))
-        left = F.relu(left)
+        left = F.relu(left, inplace=True)
         left = self.deconv_2(left)
 
         # right branch
-        right = self.spade_3(input)
-        right = F.relu(right)
+        right = self.spade_3((x, 1-mask))
+        right = F.relu(right, inplace=True)
         right = self.deconv_3(right)
         left = left + right
 
