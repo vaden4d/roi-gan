@@ -42,12 +42,16 @@ class Trainer:
                     
                 name = 'temporary_{}'.format(str(idx))
                 setattr(self, name, [])
+                
+                def _hook(name):
+                    def hook(module, input, output):
+                        if self.extract_features:
+                            getattr(self, name).append(output)
+                        else:
+                            pass
+                    return hook
 
-                def hook(module, input, output):
-                    if self.extract_features:
-                        getattr(self, name).append(output)
-                    else:
-                        pass
+                hook = _hook(name)
 
                 if self.multi_gpu:
                     self.dis.module.net[idx].register_forward_hook(hook)
@@ -65,7 +69,8 @@ class Trainer:
 
         self.extract_features = False
             
-        _, _, generated_samples = self.gen((noise, batch, mask))
+        #_, _, generated_samples = self.gen((noise, batch, mask))
+        generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
         probs_real = self.dis((batch, mask))
 
@@ -86,13 +91,14 @@ class Trainer:
 
         self.extract_features = False
 
-        mean, logvar, generated_samples = self.gen((noise, batch, mask))
+        #mean, logvar, generated_samples = self.gen((noise, batch, mask))
+        generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
 
         # or with detach?
         self.loss_g = self.g_loss(probs_fake)
         # vae loss
-        self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        #self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.is_fmatch:
 
@@ -110,6 +116,14 @@ class Trainer:
 
             # inference on the real batch
             _ = self.dis((batch, mask))
+            print(globals())
+            print(list(map(lambda x: x.size(), getattr(self, 'temporary_0'))))
+            print(list(map(lambda x: x.size(), getattr(self, 'temporary_1'))))
+            print(list(map(lambda x: x.size(), getattr(self, 'temporary_4'))))
+            print(len(getattr(self, 'temporary_0')))
+            print(len(getattr(self, 'temporary_1')))
+            print(len(getattr(self, 'temporary_4')))
+            print(adsf)
 
             # collect all intermidiate variables
             # per one layer for real batch

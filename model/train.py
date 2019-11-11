@@ -243,6 +243,9 @@ for epoch in range(0, num_epochs):
             trainer.writer.add_scalars('iter_loss/loss_d', {'train' : loss_d.item()}, trainer.num_updates)
             trainer.writer.add_scalars('iter_loss/loss_g', {'train' : loss_g.item()}, trainer.num_updates)
 
+    # freed memory
+    torch.cuda.empty_cache()
+
     # log train stats
     train_loss_gen /= num_batches
     train_loss_dis /= num_batches

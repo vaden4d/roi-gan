@@ -29,7 +29,7 @@ stabilizing_hyperparams = {'adding_noise': True
 }
 
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         'n_layers_fe_matching': [1],
+                                         'n_layers_fe_matching': [0, 1, 4],
                                          'loss': 'ls' # 'ls' or 'vanilla'
 }
 
@@ -39,7 +39,7 @@ generator_stabilizing_hyperparams = {'roi_loss': True,
 }
 
 # train/test hyperparameters
-train_hyperparams = {'num_epochs': 100,
+train_hyperparams = {'num_epochs': 20,
                     'batch_size': 128,
                     'sample_interval': 1
 }
