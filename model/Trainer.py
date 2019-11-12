@@ -10,7 +10,7 @@ class Trainer:
         self.device = device
         self.multi_gpu = multi_gpu
         self.n_layers_fe_matching = n_layers_fe_matching
-
+        '''
         if self.device.type == 'cuda':
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.enabled = True
@@ -20,7 +20,9 @@ class Trainer:
 
         if self.multi_gpu:
             self.gen = torch.nn.DataParallel(self.gen)
-            self.dis = torch.nn.DataParallel(self.dis)
+            self.dis = torch.nn.DataParallel(self.dis)'''
+
+        self.gen, self.dis = models
 
         self.g_optimizer, self.d_optimizer = optimizers
         self.g_loss, self.d_loss = losses
@@ -116,14 +118,6 @@ class Trainer:
 
             # inference on the real batch
             _ = self.dis((batch, mask))
-            print(globals())
-            print(list(map(lambda x: x.size(), getattr(self, 'temporary_0'))))
-            print(list(map(lambda x: x.size(), getattr(self, 'temporary_1'))))
-            print(list(map(lambda x: x.size(), getattr(self, 'temporary_4'))))
-            print(len(getattr(self, 'temporary_0')))
-            print(len(getattr(self, 'temporary_1')))
-            print(len(getattr(self, 'temporary_4')))
-            print(adsf)
 
             # collect all intermidiate variables
             # per one layer for real batch
@@ -156,19 +150,19 @@ class Trainer:
                 name = 'temporary_{}'.format(str(idx))
                 setattr(self, name, [])
 
-            self.loss_g += self.fe_loss(fake_feats, real_feats)
+            self.loss_g += self.fe_loss(fake_feats, real_feats) / len(self.n_layers_fe_matching)
 
         if self.is_roi_loss:
 
             loss_roi = ((1 - mask) * (generated_samples - batch))**2
-            loss_roi = 2 * loss_roi.mean() 
+            loss_roi = loss_roi.mean() 
 
             self.loss_g += loss_roi
 
-            loss_int = (mask * (generated_samples - batch))**2
-            loss_int = 2 * loss_int.mean()
+            #loss_int = (mask * (generated_samples - batch))**2
+            #loss_int = 0.1 * loss_int.mean()
 
-            self.loss_g += loss_int
+            #self.loss_g += loss_int
 
         return generated_samples, self.loss_g
 

@@ -24,6 +24,7 @@ class SPADE(nn.Module):
         self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
 
         self.weight = nn.Parameter(torch.randn(n_channels))
+        #self.style_weight = nn.Parameter(torch.randn(n_channels))
 
     def forward(self, input):
 
@@ -43,8 +44,9 @@ class SPADE(nn.Module):
 
         noise = torch.randn(beta.size(0), 1, beta.size(2), beta.size(3), 
                             device=beta.device, dtype=beta.dtype)
+        mask = F.interpolate(mask, size=beta.size(2), mode='bilinear', align_corners=False)
         # apply scale and bias
-        out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1)
+        out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1) * mask
 
         return out
 

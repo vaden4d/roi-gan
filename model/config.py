@@ -29,7 +29,7 @@ stabilizing_hyperparams = {'adding_noise': True
 }
 
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         'n_layers_fe_matching': [0, 1, 4],
+                                         'n_layers_fe_matching': list(range(14)),
                                          'loss': 'ls' # 'ls' or 'vanilla'
 }
 
@@ -46,7 +46,7 @@ train_hyperparams = {'num_epochs': 20,
 
 # add lr-scheduling possibility
 optimizator_hyperparams = {'lr_gen': 0.0001,
-                           'lr_dis': 0.00015,
+                           'lr_dis': 0.0001,
 }
 
 # dataset constants

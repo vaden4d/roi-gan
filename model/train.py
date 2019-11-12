@@ -18,6 +18,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 import torch
+from torch.nn import DataParallel
 from torch.autograd import Variable
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -112,6 +113,20 @@ optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=(0.5
 initial_epoch = 0
 num_updates = 0
 # if there is checkpoint, download it
+
+if device.type == 'cuda':
+
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.enabled = True
+
+    discriminator = discriminator.to(device)
+    generator = generator.to(device)
+
+if multi_gpu:
+
+    generator = torch.nn.DataParallel(generator)
+    discriminator = torch.nn.DataParallel(discriminator)
+
 if chkpdir and chkpname_dis and chkpname_gen:
 
     # load state of networks
@@ -119,13 +134,21 @@ if chkpdir and chkpname_dis and chkpname_gen:
     state_dis = load_model(chkpdir, chkpname_dis)
 
     # load generator
+    #generator = generator.to(device)
+    if multi_gpu:
+        #generator = DataParallel(generator)
+        generator = generator.cuda()
     generator.load_state_dict(state_gen['model'])
-    generator = generator.to(device)
+    #generator = generator.to(device)
     optimizer_G.load_state_dict(state_gen['optimizer'])
 
     # load discriminator
+    #discriminator = discriminator.to(device)
+    if multi_gpu:
+        #discriminator = DataParallel(discriminator)
+        discriminator = discriminator.cuda()
     discriminator.load_state_dict(state_dis['model'])
-    discriminator = discriminator.to(device)
+    #discriminator = discriminator.to(device)
     optimizer_D.load_state_dict(state_dis['optimizer'])
 
     initial_epoch = state_gen['epoch']
@@ -136,29 +159,6 @@ discriminator_loss_hyperparams = config.discriminator_stabilizing_hyperparams
 
 generator_loss = GeneratorLoss(**generator_loss_hyperparams)
 discriminator_loss = DiscriminatorLoss(**discriminator_loss_hyperparams)
-'''
-if loss_type == 'vanilla':
-
-    generator_loss = vanilla_generator_loss
-    discriminator_loss = vanilla_discriminator_loss
-
-elif loss_type == 'ls':
-
-    generator_loss = ls_generator_loss
-    discriminator_loss = ls_discriminator_loss
-
-else:
-
-    raise NotImplementedError
-'''
-'''
-if is_fe_matching:
-
-    def hook(module, input, output):
-        discriminator.int_outputs.append(output)
-
-    for idx in n_layers_fe_matching:
-        discriminator.net[idx].register_forward_hook(hook)'''
 
 writer = SummaryWriter(logdir)
 trainer = Trainer(models=[generator,
