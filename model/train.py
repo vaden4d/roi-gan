@@ -57,7 +57,6 @@ sample_interval = config.train_hyperparams['sample_interval']
 
 lr_gen = config.optimizator_hyperparams['lr_gen']
 lr_dis = config.optimizator_hyperparams['lr_dis']
-#loss_type = config.optimizator_hyperparams['loss']
 
 clip_norm = config.model_hyperparams['clip_norm']
 roi_function = config.model_hyperparams['function']
@@ -89,9 +88,20 @@ data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_wo
 print('Number of samples for train - {}'.format(len(data_loader)))
 print('Batch size - {}'.format(batch_size))
 
+generator_loss_hyperparams = config.generator_stabilizing_hyperparams
+discriminator_loss_hyperparams = config.discriminator_stabilizing_hyperparams
+
+# wgan setting
+if (generator_loss_hyperparams['loss'] == 'wgan' and discriminator_loss_hyperparams['loss'] != 'wgan') or \
+    (generator_loss_hyperparams['loss'] != 'wgan' and discriminator_loss_hyperparams['loss'] == 'wgan'):
+    raise NotImplementedError
+
+wgan_clip_size = discriminator_loss_hyperparams['wgan_clip_size']
+is_wgan = generator_loss_hyperparams['loss'] == 'wgan' and discriminator_loss_hyperparams == 'wgan'
+
 # Initialize generator, discriminator and RoI generator
 generator = Generator(**config.gen_hyperparams)
-discriminator = Discriminator(dis_n_features)
+discriminator = Discriminator(dis_n_features, is_wgan=is_wgan)
 roi = RoI(image_size, locals()[roi_function], len(train_data))
 roi_loader = DataLoader(roi, batch_size=batch_size, shuffle=False, num_workers=5)
 
@@ -154,9 +164,6 @@ if chkpdir and chkpname_dis and chkpname_gen:
     initial_epoch = state_gen['epoch']
     num_updates = state_gen['iter']
 
-generator_loss_hyperparams = config.generator_stabilizing_hyperparams
-discriminator_loss_hyperparams = config.discriminator_stabilizing_hyperparams
-
 generator_loss = GeneratorLoss(**generator_loss_hyperparams)
 discriminator_loss = DiscriminatorLoss(**discriminator_loss_hyperparams)
 
@@ -174,7 +181,9 @@ trainer = Trainer(models=[generator,
                     multi_gpu=multi_gpu,
                     is_fmatch=is_fe_matching,
                     n_layers_fe_matching=n_layers_fe_matching,
-                    is_roi_loss=is_roi_loss
+                    is_roi_loss=is_roi_loss,
+                    is_wgan=is_wgan,
+                    wgan_clip_size=wgan_clip_size
                     )
 
 # saving generated
@@ -243,8 +252,8 @@ for epoch in range(0, num_epochs):
             trainer.writer.add_scalars('iter_loss/loss_d', {'train' : loss_d.item()}, trainer.num_updates)
             trainer.writer.add_scalars('iter_loss/loss_g', {'train' : loss_g.item()}, trainer.num_updates)
 
-    # freed memory
-    torch.cuda.empty_cache()
+            # freed memory
+            torch.cuda.empty_cache()
 
     # log train stats
     train_loss_gen /= num_batches

@@ -5,7 +5,8 @@ from torch.nn.parallel.scatter_gather import gather
 
 class Trainer:
     def __init__(self, models, optimizers, losses, clip_norm,
-        writer, num_updates, device, multi_gpu, is_fmatch, n_layers_fe_matching, is_roi_loss):
+        writer, num_updates, device, multi_gpu, is_fmatch, n_layers_fe_matching, 
+        is_roi_loss, is_wgan, wgan_clip_size):
 
         self.device = device
         self.multi_gpu = multi_gpu
@@ -30,8 +31,12 @@ class Trainer:
         self.clip_norm = clip_norm
         self.writer = writer
         self.num_updates = num_updates
+
         self.is_fmatch = is_fmatch
         self.is_roi_loss = is_roi_loss
+
+        self.wgan_clip_size = wgan_clip_size
+        self.is_wgan = is_wgan
 
         self.n_devices = torch.cuda.device_count()
 
@@ -71,14 +76,11 @@ class Trainer:
 
         self.extract_features = False
             
-        #_, _, generated_samples = self.gen((noise, batch, mask))
         generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
         probs_real = self.dis((batch, mask))
 
         self.loss_d = self.d_loss(probs_fake, probs_real)
-        #self.loss_d.backward()
-        #self.d_optimizer.step()
 
         return generated_samples, self.loss_d
 
@@ -93,7 +95,6 @@ class Trainer:
 
         self.extract_features = False
 
-        #mean, logvar, generated_samples = self.gen((noise, batch, mask))
         generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples, mask))
 
@@ -171,6 +172,9 @@ class Trainer:
         self.loss_d.backward()
         #torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
         self.d_optimizer.step()
+        if self.is_wgan:
+            for parameters in self.dis.parameters():
+                parameters.data.clamp_(-self.wgan_clip_size, self.wgan_clip_size)
 
     def backward_generator(self):
 

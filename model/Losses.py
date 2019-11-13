@@ -35,6 +35,17 @@ def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     loss = loss.mean()
     return loss
 
+def wasserstein_discriminator_loss(fake_outputs_logprobs, real_outputs_logprobs):
+    # mean x D(x) - mean z D(G(z)), where D is dense vector -> max
+    loss = -(real_outputs_logprobs.mean() - fake_outputs_logprobs.mean())
+    return loss
+
+def wasserstein_generator_loss(fake_outputs_logprobs):
+    # mean z D(G(z)) -> max
+    loss = -fake_outputs_logprobs.mean()
+    return loss
+
+
 class DiscriminatorLoss(nn.Module):
 
     def __init__(self, **kwargs):
@@ -46,6 +57,8 @@ class DiscriminatorLoss(nn.Module):
             self.loss_func = ls_discriminator_loss
         elif self.loss == 'vanilla':
             self.loss_func = vanilla_discriminator_loss
+        elif self.loss == 'wgan':
+            self.loss_func = wasserstein_discriminator_loss
         else:
             raise NotImplementedError
 
@@ -66,6 +79,8 @@ class GeneratorLoss(nn.Module):
             self.loss_func = vanilla_generator_loss
         elif self.loss == 'ls':
             self.loss_func = ls_generator_loss
+        elif self.loss == 'wgan':
+            self.loss_func = wasserstein_generator_loss
         else:
             raise NotImplementedError
 

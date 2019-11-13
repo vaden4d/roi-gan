@@ -139,6 +139,8 @@ class Generator(nn.Module):
             )
             self.names.append(name)
 
+        
+
     def forward(self, input):
 
         _, x, mask = input
@@ -158,9 +160,10 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
 
-    def __init__(self, n_feats=128, scale=1.2):
+    def __init__(self, n_feats=128, scale=1.2, is_wgan=False):
         super(Discriminator, self).__init__()
         self.n_feats = n_feats
+        self.is_wgan = is_wgan
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(3, self.n_feats, 2, 2, bias=False),
@@ -216,7 +219,8 @@ class Discriminator(nn.Module):
         #x = self.pooling(x)
         # sigmoid
         x = x.view(-1, 1)
-        x = torch.sigmoid(x)
+        if ~self.is_wgan:
+            x = torch.sigmoid(x)
 
         return x
 

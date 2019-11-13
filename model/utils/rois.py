@@ -3,35 +3,6 @@ import torch
 from scipy.stats import multivariate_normal
 from torch.utils.data import Dataset
 
-class RoI2:
-
-    def __init__(self, image_shape, sampling_rule, device, mode):
-
-        self.shape = image_shape
-        self.f = sampling_rule
-        self.device = device
-        self.mode = mode
-
-    def sample(self):
-
-        mask = torch.from_numpy(self.f(self.shape)).float()
-        #mask = self.f(self.shape).float()
-        return mask
-
-    def generate_masks(self, n):
-
-        if self.mode == 'full':
-            masks = [self.sample() for i in range(n)]
-            masks = torch.stack(masks)
-            masks = masks.to(self.device)
-
-        elif self.mode == 'duplicate':
-            masks = self.sample()
-            masks = masks.unsqueeze(0).repeat(n, 1, 1, 1)
-            masks = masks.to(self.device)
-
-        return masks
-
 class RoI(Dataset):
 
     def __init__(self, image_shape, sampling_rule, size):
@@ -41,8 +12,7 @@ class RoI(Dataset):
         self.size = size
 
     def __getitem__(self, idx):
-
-        mask = torch.from_numpy(self.f(self.shape)).float()
+        mask = torch.from_numpy(self.f(self.shape).astype(int)).float()
         return mask
 
     def __len__(self):
