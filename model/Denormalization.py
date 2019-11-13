@@ -17,7 +17,7 @@ class SPADE(nn.Module):
         n_hidden = 128
         self.shared = nn.Sequential(
             nn.Conv2d(1, n_hidden, kernel_size=self.kernel_size),
-            nn.ReLU()
+            nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
@@ -29,24 +29,25 @@ class SPADE(nn.Module):
     def forward(self, input):
 
         x, mask = input
+
         # normalize input
         normalized = self.normalization(x)
 
         # beta and gamma generation
-        size_x = x.size()[2] + 2 * self.kernel_size - 2
-        size_y = x.size()[3] + 2 * self.kernel_size - 2
-        mask = F.interpolate(mask, size=(size_x, size_y) , mode='bilinear', align_corners=False)
+        size_x = x.size(2) + 2 * self.kernel_size - 2
+        size_y = x.size(3) + 2 * self.kernel_size - 2
+        
+        mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
         
         activations = self.shared(mask)
-        
-        gamma = self.conv_gamma(activations)
+        gamma = self.conv_gamma(1 - activations)
         beta = self.conv_beta(activations)
 
         noise = torch.randn(beta.size(0), 1, beta.size(2), beta.size(3), 
                             device=beta.device, dtype=beta.dtype)
-        mask = F.interpolate(mask, size=beta.size(2), mode='bilinear', align_corners=False)
+        mask = F.interpolate(mask, size=beta.size(2), mode='nearest')
         # apply scale and bias
-        out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1) * mask
+        out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1)
 
         return out
 
@@ -100,7 +101,7 @@ class DenormResBlock(nn.Module):
         left = self.deconv_2(left)
 
         # right branch
-        right = self.spade_3((x, 1-mask))
+        right = self.spade_3((x, mask))
         right = F.relu(right, inplace=True)
         right = self.deconv_3(right)
         left = left + right

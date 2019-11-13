@@ -8,7 +8,7 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '0,1,2,3',
+              'gpu_devices': '0,1',
               'multi_gpu': True
 }
 
@@ -31,12 +31,12 @@ stabilizing_hyperparams = {'adding_noise': True
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
                                          'n_layers_fe_matching': list(range(14)),
                                          'wgan_clip_size': 1e-1,
-                                         'loss': 'wgan' # 'ls', 'wgan' or 'vanilla'
+                                         'loss': 'ls' # 'ls', 'wgan' or 'vanilla'
 }
 
 generator_stabilizing_hyperparams = {'roi_loss': True,
                                      'vae_loss': True,
-                                     'loss': 'wgan' # 'ls', 'wgan' or 'vanilla'
+                                     'loss': 'ls' # 'ls', 'wgan' or 'vanilla'
 }
 
 # train/test hyperparameters
