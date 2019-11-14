@@ -23,12 +23,15 @@ class SPADE(nn.Module):
         self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
         self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
 
-        self.weight = nn.Parameter(torch.randn(n_channels))
-        #self.style_weight = nn.Parameter(torch.randn(n_channels))
+        self.n_channels = n_channels
+        self.dense = nn.Sequential(
+            nn.Linear(128, 2 * n_channels),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
 
     def forward(self, input):
 
-        x, mask = input
+        z, x, mask = input
 
         # normalize input
         normalized = self.normalization(x)
@@ -40,14 +43,19 @@ class SPADE(nn.Module):
         mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
         
         activations = self.shared(mask)
-        gamma = self.conv_gamma(1 - activations)
+        
+        gamma = self.conv_gamma(activations)
         beta = self.conv_beta(activations)
 
-        noise = torch.randn(beta.size(0), 1, beta.size(2), beta.size(3), 
-                            device=beta.device, dtype=beta.dtype)
-        mask = F.interpolate(mask, size=beta.size(2), mode='nearest')
+        z = self.dense(z)
+
+        #gamma = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * gamma + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
+        beta = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * beta + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
+
+        #mask = F.interpolate(mask, size=beta.size(2), mode='nearest')
         # apply scale and bias
-        out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1)
+        out = normalized * (1 + gamma) + beta
+        #out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1) 
 
         return out
 
@@ -89,19 +97,19 @@ class DenormResBlock(nn.Module):
 
     def forward(self, input):
 
-        x, mask = input
+        z, x, mask = input
 
         # left branch
-        left = self.spade_1((x, mask))
+        left = self.spade_1((z, x, mask))
         left = F.relu(left, inplace=True)
         left = self.deconv_1(left)
         
-        left = self.spade_2((left, mask))
+        left = self.spade_2((z, left, mask))
         left = F.relu(left, inplace=True)
         left = self.deconv_2(left)
 
         # right branch
-        right = self.spade_3((x, mask))
+        right = self.spade_3((z, x, mask))
         right = F.relu(right, inplace=True)
         right = self.deconv_3(right)
         left = left + right

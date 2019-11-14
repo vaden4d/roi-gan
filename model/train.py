@@ -218,7 +218,7 @@ for epoch in range(0, num_epochs):
             batch_size = images.size()[0]
             
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_input_channels, *input_size).to(device)
+            random = torch.randn(batch_size, 128).to(device)
             #mask = roi.generate_masks(batch_size)
             gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
 
@@ -227,15 +227,15 @@ for epoch in range(0, num_epochs):
 
             #for _ in range(2):
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, gen_input_channels, *input_size).to(device)
+            random = torch.randn(batch_size, 128).to(device)
             #mask = roi.generate_masks(batch_size)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
 
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_g.item() * 1.5 > loss_d.item()
-            train_dis = loss_d.item() * 1.5 > loss_g.item()
+            train_gen = loss_g.item() * 2 > loss_d.item()
+            train_dis = loss_d.item() * 2 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()

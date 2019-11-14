@@ -6,6 +6,17 @@ from Denormalization import DenormResBlock
 import torch.nn.functional as F
 import numpy as np
 
+class Constant(nn.Module):
+
+    def __init__(self, *tensor_size):
+        super(Constant, self).__init__()
+
+        self.constant = nn.Parameter(torch.randn(1, *tensor_size))
+
+    def forward(self, x):
+        constant = self.constant.repeat(x.size(0), 1, 1, 1)
+        return constant
+
 class Encoder(nn.Module):
 
     def __init__(self, init_size=(64, 64),
@@ -139,17 +150,18 @@ class Generator(nn.Module):
             )
             self.names.append(name)
 
-        
+        #self.const = Constant(self.input_channels, *self.dest_size)
 
     def forward(self, input):
 
-        _, x, mask = input
+        z, x, mask = input
+        #x = self.const(x)
         x = self.encoder(x)
         #x = z * logvar.mul(0.5).exp() + mean
 
         for name in self.names:
 
-            x = getattr(self, name)((x, mask))
+            x = getattr(self, name)((z, x, mask))
             if x.size(1) != 3:
                 x = F.leaky_relu(x, 0.2, inplace=True)
             else:
