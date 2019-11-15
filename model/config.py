@@ -2,8 +2,8 @@
 logs_hyperparams = {'chkp_dir': 'chkp/',
                     'log_dir': 'logs/train_logs/',
                     # None if training from the scratch
-                    'chkp_name_gen': 'gen-epoch-19.chkp',
-                    'chkp_name_dis': 'dis-epoch-19.chkp'
+                    'chkp_name_gen': None,
+                    'chkp_name_dis': None
 }
 
 # check gpu devices

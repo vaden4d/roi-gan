@@ -25,7 +25,7 @@ class SPADE(nn.Module):
 
         self.n_channels = n_channels
         self.dense = nn.Sequential(
-            nn.Linear(128, 2 * n_channels),
+            nn.Linear(128, 2 * 128),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
@@ -42,14 +42,16 @@ class SPADE(nn.Module):
         
         mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
         
+        z = self.dense(z)
         activations = self.shared(mask)
+        activations = z[:, :128].view(z.size(0), 128, 1, 1) * activations + z[:, 128:].view(z.size(0), 128, 1, 1)
         
         gamma = self.conv_gamma(activations)
         beta = self.conv_beta(activations)
 
-        z = self.dense(z)
+        #z = self.dense(z)
 
-        gamma = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * gamma + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
+        #gamma = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * gamma + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
         #beta = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * beta + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
 
         #mask = F.interpolate(mask, size=beta.size(2), mode='nearest')

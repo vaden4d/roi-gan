@@ -155,7 +155,7 @@ class Trainer:
 
         if self.is_roi_loss:
 
-            loss_roi = ((1 - mask) * (generated_samples - batch))**2
+            loss_roi = 0.5 * ((1 - mask) * (generated_samples - batch))**2
             loss_roi = loss_roi.mean() 
 
             self.loss_g += loss_roi
