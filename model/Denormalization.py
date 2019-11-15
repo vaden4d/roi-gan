@@ -20,6 +20,8 @@ class SPADE(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
+        self.mask_normalization = nn.BatchNorm2d(n_hidden, affine=False)
+
         self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
         self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
 
@@ -42,8 +44,10 @@ class SPADE(nn.Module):
         
         mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
         
-        z = self.dense(z)
         activations = self.shared(mask)
+        activations = self.mask_normalization(activations)
+
+        z = self.dense(z)
         activations = z[:, :128].view(z.size(0), 128, 1, 1) * activations + z[:, 128:].view(z.size(0), 128, 1, 1)
         
         gamma = self.conv_gamma(activations)
