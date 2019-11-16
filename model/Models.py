@@ -150,12 +150,22 @@ class Generator(nn.Module):
             self.names.append(name)
 
         #self.const = Constant(self.input_channels, *self.dest_size)
+        self.dense_1 = nn.Linear(128, 256)
+        self.dense_2 = nn.Linear(256, 256)
+        self.dense_3 = nn.Linear(256, 256)
 
     def forward(self, input):
 
         z, x, mask = input
         #x = self.const(x)
         x = self.encoder(x)
+
+        z = self.dense_1(z)
+        z = F.leaky_relu(z, 0.2, inplace=True)
+        z = self.dense_2(z)
+        z = F.leaky_relu(z, 0.2, inplace=True)
+        z = self.dense_3(z)
+
         #x = z * logvar.mul(0.5).exp() + mean
 
         for name in self.names:

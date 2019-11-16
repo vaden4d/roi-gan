@@ -41,10 +41,10 @@ class SPADE(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        self.dense = nn.Sequential(
-            nn.Linear(128, 2 * 128),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
+        #self.dense = nn.Sequential(
+        #    nn.Linear(128, 2 * 128),
+        #    nn.LeakyReLU(0.2, inplace=True)
+        #)
 
         self.gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
         self.beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
@@ -65,7 +65,7 @@ class SPADE(nn.Module):
         gamma = self.non_mask_conv(1 - mask)
         beta = self.mask_conv(mask)
 
-        z = self.dense(z)
+        #z = self.dense(z)
         #print(z.size())
         #print(beta.size())
         beta = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * beta + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
@@ -134,6 +134,8 @@ class DenormResBlock(nn.Module):
                                             2 * self.kernel_size - 1,
                                             stride=1,
                                             bias=False)
+
+        self.dense_1 = nn.Linear(256, 256)
 
     def forward(self, input):
 

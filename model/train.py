@@ -235,8 +235,8 @@ for epoch in range(0, num_epochs):
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_ .item() * 1.5 > loss_d.item()
-            train_dis = loss_d.item() * 1.5 > loss_ .item()
+            train_gen = loss_g.item() * 1.5 > loss_d.item()
+            train_dis = loss_d.item() * 1.5 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
