@@ -32,7 +32,7 @@ def ls_generator_loss(fake_outputs_probs):
 def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     # (D(x)-1)**2 + (D(G(z)))**2 -> min w.r.t D
     loss = (real_outputs_probs - 1)**2 + fake_outputs_probs**2
-    loss = loss.mean()
+    loss = 0.5 * loss.mean()
     return loss
 
 def wasserstein_discriminator_loss(fake_outputs_logprobs, real_outputs_logprobs):

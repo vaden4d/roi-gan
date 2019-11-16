@@ -203,6 +203,7 @@ for epoch in range(0, num_epochs):
     train_loss_gen = 0
     train_loss_dis = 0
 
+    i = 0
     current_epoch = initial_epoch + epoch
     with tqdm(ascii=True, leave=False,
               total=len(data_loader), desc='Epoch {}'.format(current_epoch)) as bar:
@@ -229,13 +230,13 @@ for epoch in range(0, num_epochs):
             #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
             random = torch.randn(batch_size, 128).to(device)
             #mask = roi.generate_masks(batch_size)
-            gen_images, loss_g = trainer.train_step_generator(random, mask, images)
-
+            gen_images, loss_g, loss_ = trainer.train_step_generator(random, mask, images)
+                
             if train_gen:
                 trainer.backward_generator()
             
-            train_gen = loss_g.item() * 1.5 > loss_d.item()
-            train_dis = loss_d.item() * 1.5 > loss_g.item()
+            train_gen = loss_ .item() * 1.5 > loss_d.item()
+            train_dis = loss_d.item() * 1.5 > loss_ .item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
@@ -254,6 +255,8 @@ for epoch in range(0, num_epochs):
 
             # freed memory
             torch.cuda.empty_cache()
+
+            i += 1
 
     # log train stats
     train_loss_gen /= num_batches

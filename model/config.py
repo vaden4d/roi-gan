@@ -15,6 +15,7 @@ train_mode = {'gpu': True,
 print_summary = False
 model_hyperparams = {'clip_norm': 1e-2,
                      'function': 'gaussian_roi', # roi generation function
+                     'spectral_norm': True,
                      'dis_n_features': 128 # n_features in discriminator
 }
 

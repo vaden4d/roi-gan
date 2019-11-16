@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import spectral_norm
 from torchsummary import summary
 from Denormalization import DenormResBlock
 import torch.nn.functional as F

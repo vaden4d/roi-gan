@@ -100,6 +100,7 @@ class Trainer:
 
         # or with detach?
         self.loss_g = self.g_loss(probs_fake)
+        loss_  = self.loss_g.item()
         # vae loss
         #self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
@@ -165,7 +166,7 @@ class Trainer:
 
             #self.loss_g += loss_int
 
-        return generated_samples, self.loss_g
+        return generated_samples, self.loss_g, loss_ 
 
     def backward_discriminator(self):
 
