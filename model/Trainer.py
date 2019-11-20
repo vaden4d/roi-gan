@@ -96,7 +96,7 @@ class Trainer:
         # or with detach?
         loss_g = self.g_loss(probs_fake)
         # vae loss
-        loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        loss_g += -torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.is_fmatch:
 
@@ -150,7 +150,7 @@ class Trainer:
 
         if self.is_roi_loss:
 
-            loss_roi = 1e-3 * ((1 - mask) * (generated_samples - batch))**2
+            loss_roi = 1e-1 * ((1 - mask) * (generated_samples - batch))**2
             #loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 

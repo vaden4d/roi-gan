@@ -79,42 +79,58 @@ class Encoder(nn.Module):
         print('Resolutions: ', self.resolutions)
         print('Channels: ', self.channels)'''
 
-        self.layer_1 = nn.Conv2d(3, 8, kernel_size=2, stride=2)
-        self.layer_2 = nn.Conv2d(8, 16, kernel_size=2, stride=2)
-        self.layer_3 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
-        self.layer_4 = nn.Conv2d(32, 64, kernel_size=2, stride=2)
-        self.layer_5 = nn.Conv2d(64, 128, kernel_size=2, stride=2)
+        self.layer_1 = nn.Conv2d(4, 7, kernel_size=2, stride=2)
+        self.layer_2 = nn.Conv2d(8, 15, kernel_size=2, stride=2)
+        self.layer_3 = nn.Conv2d(16, 31, kernel_size=2, stride=2)
+        self.layer_4 = nn.Conv2d(32, 63, kernel_size=2, stride=2)
+        self.layer_5 = nn.Conv2d(64, 127, kernel_size=2, stride=2)
 
         self.mean = nn.Conv2d(128, 128, kernel_size=2, stride=2)
         self.logvar = nn.Conv2d(128, 128, kernel_size=2, stride=2)
 
 
-    def forward(self, x):
-        
+    def forward(self, input):
+        x, mask = input
         '''for name, resolution in zip(self.names, self.resolutions):
 
             x = getattr(self, name)(x)
             x = F.leaky_relu(x, 0.2, inplace=True)
             #x = F.interpolate(x, size=resolution, mode='bilinear', align_corners=False)'''
         
+        x = torch.cat([x, mask], dim=1)
         x = self.layer_1(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
+        mask = F.interpolate(mask, scale_factor=0.5, mode='nearest')
+
+        x = torch.cat([x, mask], dim=1)
         x = self.layer_2(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
+        mask = F.interpolate(mask, scale_factor=0.5, mode='nearest')
+
+        x = torch.cat([x, mask], dim=1)
         x = self.layer_3(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
+        mask = F.interpolate(mask, scale_factor=0.5, mode='nearest')
+
+        x = torch.cat([x, mask], dim=1)
         x = self.layer_4(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
+        mask = F.interpolate(mask, scale_factor=0.5, mode='nearest')
+
+        x = torch.cat([x, mask], dim=1)
         x = self.layer_5(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
+        mask = F.interpolate(mask, scale_factor=0.5, mode='nearest')
         #x = self.layer_6(x)
         #x = F.leaky_relu(x, 0.2)
 
         #x = x.view(x.size(0), -1)
         #mean = self.dense_mean(x)
         #logvar = self.dense_logvar(x)
+        x = torch.cat([x, mask], dim=1)
         mean = self.mean(x)
         mean = mean.view(mean.size(0), -1)
+        
         logvar = self.logvar(x)
         logvar = logvar.view(logvar.size(0), -1)
 
@@ -194,7 +210,7 @@ class Generator(nn.Module):
 
         z, x, mask = input
         #x = self.const(x)
-        mean, logvar = self.encoder(x)
+        mean, logvar = self.encoder((x, mask))
 
         z = z * logvar.mul(0.5).exp() + mean
         x = F.pixel_shuffle(z.view(z.size(0), -1, 1, 1), 2)

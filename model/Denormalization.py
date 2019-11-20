@@ -3,6 +3,47 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class DiscriminatorBlock(nn.Module):
+
+    def __init__(self, input_channels, output_channels, kernel_size, n_hidden):
+        super().__init__()
+
+        self.normalization = nn.BatchNorm2d(n_channels, affine=False)
+        self.kernel_size = kernel_size
+        self.n_hidden = n_hidden
+        
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+
+        # hidden layer
+        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+
+        self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+
+    def forward(self, input):
+
+        z, x, mask = input
+
+        # normalize input
+        normalized = self.normalization(x)
+
+        # beta and gamma generation
+        size_x = x.size(2) + 2 * self.kernel_size - 2
+        size_y = x.size(3) + 2 * self.kernel_size - 2
+
+        mask_ = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
+        
+        mask_ = self.shared(mask_)
+        mask_ = F.leaky_relu(mask_, 0.2, inplace=True)
+
+        gamma = self.gamma(mask_)
+        beta = self.beta(mask_)
+
+        out = normalized * (1 + gamma) + beta
+
+        return out, mask
+
 class SPADE(nn.Module):
 
     def __init__(self, n_channels, kernel_size, n_hidden):
@@ -44,7 +85,6 @@ class SPADE(nn.Module):
         out = normalized * (1 + gamma) + beta
 
         return out
-
 
 class DenormResBlock(nn.Module):
 
