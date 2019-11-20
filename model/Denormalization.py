@@ -14,40 +14,10 @@ class SPADE(nn.Module):
         self.n_channels = n_channels
 
         # hidden layer
-        #n_hidden = n_channels // 2
-        '''n_hidden = 128
-        self.shared = nn.Sequential(
-            nn.Conv2d(1, n_hidden, kernel_size=self.kernel_size),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
+        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
 
-        self.mask_normalization = nn.BatchNorm2d(n_hidden, affine=False)
-
-        self.conv_gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
-        self.conv_beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
-
-        self.dense = nn.Sequential(
-            nn.Linear(128, 2 * 128),
-            nn.LeakyReLU(0.2, inplace=True)
-        )'''
-
-        self.mask_conv = nn.Sequential(
-            nn.Conv2d(1, n_hidden, kernel_size=self.kernel_size),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.non_mask_conv = nn.Sequential(
-            nn.Conv2d(1, n_hidden, kernel_size=self.kernel_size),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        #self.dense = nn.Sequential(
-        #    nn.Linear(128, 2 * 128),
-        #    nn.LeakyReLU(0.2, inplace=True)
-        #)
-
-        self.gamma = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
-        self.beta = nn.Conv2d(n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
 
     def forward(self, input):
 
@@ -61,41 +31,17 @@ class SPADE(nn.Module):
         size_y = x.size(3) + 2 * self.kernel_size - 2
 
         mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
+        
+        mask = self.shared(mask)
+        mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
+        mask = F.leaky_relu(mask, 0.2, inplace=True)
 
-        gamma = self.non_mask_conv(1 - mask)
-        beta = self.mask_conv(mask)
+        gamma = self.gamma(mask)
+        beta = self.beta(mask)
 
-        #z = self.dense(z)
-        #print(z.size())
-        #print(beta.size())
-        beta = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * beta + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
-
-        gamma = self.gamma(gamma)
-        beta = self.beta(beta)
+        #mask = F.interpolate(mask, size=gamma.size()[2:], mode='nearest')
 
         out = normalized * (1 + gamma) + beta
-        '''
-        
-        mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
-        
-        activations = self.shared(mask)
-        activations = self.mask_normalization(activations)
-
-        z = self.dense(z)
-        activations = (1 + z[:, :128].view(z.size(0), 128, 1, 1)) * activations + z[:, 128:].view(z.size(0), 128, 1, 1)
-        
-        gamma = self.conv_gamma(activations)
-        beta = self.conv_beta(activations)
-
-        #z = self.dense(z)
-
-        #gamma = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * gamma + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
-        #beta = z[:, :self.n_channels].view(z.size(0), self.n_channels, 1, 1) * beta + z[:, self.n_channels:].view(z.size(0), self.n_channels, 1, 1)
-
-        mask = F.interpolate(mask, size=gamma.size()[2:], mode='nearest')
-        # apply scale and bias
-        out = normalized * (1 + gamma) + beta 
-        #out = normalized * (1 + gamma) + beta + noise * self.weight.view(1, -1, 1, 1) '''
 
         return out
 
@@ -104,59 +50,55 @@ class DenormResBlock(nn.Module):
 
     def __init__(self, input_channels, 
                         output_channels, 
-                        output_size,
                         kernel_size=3):
         super(DenormResBlock, self).__init__()
-        self.output_size = output_size
         self.kernel_size = kernel_size
         self.input_channels = input_channels
         self.output_channels = output_channels
-
+        self.padding = (self.kernel_size - 1) // 2
+        
         # left branch
-        self.n_hidden = 128
-        self.spade_1 = SPADE(input_channels, self.kernel_size, self.n_hidden)
-        self.deconv_1 = nn.Conv2d(self.input_channels, 
-                                            self.output_channels,
-                                            self.kernel_size,
-                                            stride=1,
-                                            bias=False)
-        self.spade_2 = SPADE(output_channels, self.kernel_size, self.n_hidden)
-        self.deconv_2 = nn.Conv2d(self.output_channels, 
-                                            self.output_channels,
-                                            self.kernel_size,
-                                            stride=1,
-                                            bias=False)
+        self.conv_left = nn.Conv2d(self.input_channels,
+                                    self.input_channels * 2,
+                                    self.kernel_size,
+                                    padding=self.padding)
+
+        self.spade_left = SPADE(self.input_channels, self.kernel_size, 128)
 
         # right branch
-        self.spade_3 = SPADE(input_channels, self.kernel_size, self.n_hidden)
-        self.deconv_3 = nn.Conv2d(self.input_channels, 
-                                            self.output_channels,
-                                            2 * self.kernel_size - 1,
-                                            stride=1,
-                                            bias=False)
+        self.conv_right = nn.Conv2d(self.input_channels,
+                                    self.input_channels * 2,
+                                    self.kernel_size,
+                                    padding=self.padding)
+        
+        self.spade_right = SPADE(self.input_channels, self.kernel_size, 128)
 
-        self.dense_1 = nn.Linear(256, 256)
+        # the last layer
+        self.conv = nn.Conv2d(self.input_channels,
+                                self.output_channels,
+                                self.kernel_size,
+                                padding=self.padding)
+
 
     def forward(self, input):
 
         z, x, mask = input
-
-        # left branch
-        left = self.spade_1((z, x, mask))
-        left = F.relu(left, inplace=True)
-        left = self.deconv_1(left)
         
-        left = self.spade_2((z, left, mask))
-        left = F.relu(left, inplace=True)
-        left = self.deconv_2(left)
+        # left branch
+        left = self.spade_left((z, x, mask))
+        left = self.conv_left(left)
+        left = F.leaky_relu(left, 0.2, inplace=True)
 
         # right branch
-        right = self.spade_3((z, x, mask))
-        right = F.relu(right, inplace=True)
-        right = self.deconv_3(right)
-        left = left + right
-
-        left = F.interpolate(left, size=self.output_size, mode='bilinear', align_corners=False)
+        right = self.spade_right((z, x, mask))
+        right = self.conv_right(right)
+        right = F.leaky_relu(right, 0.2, inplace=True)
+        
+        left = torch.cat([left, right], dim=1)
+        left = F.leaky_relu(left, 0.2, inplace=True)
+        
+        left = F.pixel_shuffle(left, 2)
+        left = self.conv(left)
 
         return left
 

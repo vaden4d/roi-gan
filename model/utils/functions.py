@@ -27,6 +27,15 @@ def load_model(chkp_dir, chkp_name):
     state = torch.load(os.path.join(chkp_dir, chkp_name))
     return state
 
+def count_parameters(model):
+
+    n_params = 0
+    for name, param in model.named_parameters():
+        print(name, param.numel())
+        n_params += param.numel()
+    print('Total number of parameters: {}'.format(n_params))
+
+
 def weights_init(m, init_type='xavier_uniform', gain=0.02):
     classname = m.__class__.__name__
     if classname.find('BatchNorm2d') != -1:

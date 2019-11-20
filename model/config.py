@@ -8,11 +8,11 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '0,1',
-              'multi_gpu': True
+              'gpu_devices': '3',
+              'multi_gpu': False
 }
 
-print_summary = False
+print_summary = True
 model_hyperparams = {'clip_norm': 1e-2,
                      'function': 'gaussian_roi', # roi generation function
                      'spectral_norm': True,
@@ -21,7 +21,7 @@ model_hyperparams = {'clip_norm': 1e-2,
 
 gen_hyperparams = {'init_size': (8, 8),
                     'dest_size': (64, 64),
-                    'scale': 1.5,
+                    'scale': 2,
                     'input_channels': 128,
                     'kernel_size': 3
 }
@@ -30,26 +30,26 @@ stabilizing_hyperparams = {'adding_noise': True
 }
 
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         'n_layers_fe_matching': list(range(14)),
+                                         'n_layers_fe_matching': list(range(18)),
                                          #'n_layers_fe_matching': [4],
                                          'wgan_clip_size': 1e-1,
-                                         'loss': 'ls' # 'ls', 'wgan' or 'vanilla'
+                                         'loss': 'softplus' # 'ls', 'wgan', 'softplus'
 }
 
 generator_stabilizing_hyperparams = {'roi_loss': True,
                                      'vae_loss': True,
-                                     'loss': 'ls' # 'ls', 'wgan' or 'vanilla'
+                                     'loss': 'softplus' # 'ls', 'wgan', 'softplus' 
 }
 
 # train/test hyperparameters
 train_hyperparams = {'num_epochs': 20,
                     'batch_size': 128,
-                    'sample_interval': 1
+                    'sample_interval': 500
 }
 
 # add lr-scheduling possibility
 optimizator_hyperparams = {'lr_gen': 0.0001,
-                           'lr_dis': 0.0001,
+                           'lr_dis': 0.00015
 }
 
 # dataset constants

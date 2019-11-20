@@ -2,6 +2,12 @@ import torch
 from torch.autograd import Variable
 from Losses import roi_loss, FeatureMatching
 from torch.nn.parallel.scatter_gather import gather
+import numpy as np
+
+def check_grads(model, model_name):
+    for p in model.parameters():
+        if not p.grad is None:
+            print(model_name, p.grad.size(), float(p.grad.mean()))
 
 class Trainer:
     def __init__(self, models, optimizers, losses, clip_norm,
@@ -11,17 +17,6 @@ class Trainer:
         self.device = device
         self.multi_gpu = multi_gpu
         self.n_layers_fe_matching = n_layers_fe_matching
-        '''
-        if self.device.type == 'cuda':
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.enabled = True
-            self.gen, self.dis = models[0].to(self.device), models[1].to(self.device)
-        else:
-            self.gen, self.dis = models
-
-        if self.multi_gpu:
-            self.gen = torch.nn.DataParallel(self.gen)
-            self.dis = torch.nn.DataParallel(self.dis)'''
 
         self.gen, self.dis = models
 
@@ -71,18 +66,18 @@ class Trainer:
         
         # Discriminator
         self.dis.train()
-        self.gen.eval()
+        #self.gen.eval()
         self.d_optimizer.zero_grad()
 
         self.extract_features = False
             
-        generated_samples = self.gen((noise, batch, mask))
-        probs_fake = self.dis((generated_samples, mask))
+        _, _, generated_samples = self.gen((noise, batch, mask))
+        probs_fake = self.dis((generated_samples.detach(), mask))
         probs_real = self.dis((batch, mask))
 
-        self.loss_d = self.d_loss(probs_fake, probs_real)
+        loss_d = self.d_loss(probs_fake, probs_real)
 
-        return generated_samples, self.loss_d
+        return generated_samples, loss_d
 
     def train_step_generator(self, noise, mask, batch):
 
@@ -90,19 +85,18 @@ class Trainer:
 
         # Generator
         self.gen.train()
-        self.dis.eval()
+        #self.dis.eval()
         self.g_optimizer.zero_grad()
 
         self.extract_features = False
 
-        generated_samples = self.gen((noise, batch, mask))
-        probs_fake = self.dis((generated_samples, mask))
+        mean, logvar, generated_samples = self.gen((noise, batch, mask))
+        probs_fake = self.dis((generated_samples, mask)).detach()
 
         # or with detach?
-        self.loss_g = self.g_loss(probs_fake)
-        loss_  = self.loss_g.item()
+        loss_g = self.g_loss(probs_fake)
         # vae loss
-        #self.loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.is_fmatch:
 
@@ -152,34 +146,37 @@ class Trainer:
                 name = 'temporary_{}'.format(str(idx))
                 setattr(self, name, [])
 
-            self.loss_g += self.fe_loss(fake_feats, real_feats) / len(self.n_layers_fe_matching)
+            loss_g += self.fe_loss(fake_feats, real_feats) 
 
         if self.is_roi_loss:
 
-            loss_roi = 0.5 * ((1 - mask) * (generated_samples - batch))**2
+            loss_roi = 1e-3 * ((1 - mask) * (generated_samples - batch))**2
+            #loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 
-            self.loss_g += loss_roi
+            loss_g += loss_roi
 
             #loss_int = (mask * (generated_samples - batch))**2
-            #loss_int = 0.1 * loss_int.mean()
+            #loss_int = 0.01 * loss_int.mean()
 
-            #self.loss_g += loss_int
+            #loss_g += loss_int
 
-        return generated_samples, self.loss_g, loss_ 
+        return generated_samples, loss_g
 
-    def backward_discriminator(self):
+    def backward_discriminator(self, loss_d):
 
-        self.loss_d.backward()
+        loss_d.backward()
+        #check_grads(self.dis, 'dis')
         #torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
         self.d_optimizer.step()
         if self.is_wgan:
             for parameters in self.dis.parameters():
                 parameters.data.clamp_(-self.wgan_clip_size, self.wgan_clip_size)
 
-    def backward_generator(self):
+    def backward_generator(self, loss_g):
 
-        self.loss_g.backward()
+        loss_g.backward()
+        #check_grads(self.gen, 'gen')
         #torch.nn.utils.clip_grad_norm_(self.gen.parameters(), 1e-2)
         self.g_optimizer.step()
     #    loss.backward()

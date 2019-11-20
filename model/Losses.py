@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 def roi_loss(fake, real):
     '''The loss function regulates'''
@@ -23,6 +24,15 @@ def vanilla_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     loss = (1 - fake_outputs_probs + eps).log().mean() + 0.9 * (real_outputs_probs + eps).log().mean()
     return -loss
 
+def softplus_generator_loss(fake_outputs_logprobs):
+    loss = F.softplus(-fake_outputs_logprobs).mean()
+    return loss
+
+def softplus_discriminator_loss(fake_outputs_logprobs, real_outputs_logprobs):
+    loss = F.softplus(fake_outputs_logprobs) + F.softplus(-real_outputs_logprobs)
+    loss = loss.mean()
+    return loss
+
 def ls_generator_loss(fake_outputs_probs):
     # (1 - D(G(z)))**2 -> min w.r.t G - least squares setting
     loss = (1 - fake_outputs_probs)**2
@@ -32,7 +42,7 @@ def ls_generator_loss(fake_outputs_probs):
 def ls_discriminator_loss(fake_outputs_probs, real_outputs_probs):
     # (D(x)-1)**2 + (D(G(z)))**2 -> min w.r.t D
     loss = (real_outputs_probs - 1)**2 + fake_outputs_probs**2
-    loss = 0.5 * loss.mean()
+    loss = loss.mean()
     return loss
 
 def wasserstein_discriminator_loss(fake_outputs_logprobs, real_outputs_logprobs):
@@ -59,6 +69,8 @@ class DiscriminatorLoss(nn.Module):
             self.loss_func = vanilla_discriminator_loss
         elif self.loss == 'wgan':
             self.loss_func = wasserstein_discriminator_loss
+        elif self.loss == 'softplus':
+            self.loss_func = softplus_discriminator_loss
         else:
             raise NotImplementedError
 
@@ -81,6 +93,8 @@ class GeneratorLoss(nn.Module):
             self.loss_func = ls_generator_loss
         elif self.loss == 'wgan':
             self.loss_func = wasserstein_generator_loss
+        elif self.loss == 'softplus':
+            self.loss_func = softplus_generator_loss
         else:
             raise NotImplementedError
 

@@ -18,12 +18,14 @@ class Data(Dataset):
         self.data_path = data_path
         if mean == None or std == None:
             self.transform = transforms.Compose([
-                                        transforms.Resize((64, 64)),
+                                        transforms.CenterCrop((128, 128)),
+                                        transforms.Resize(64),
                                         transforms.ToTensor()
                                         ])
         else:
             self.transform = transforms.Compose([
-                                        transforms.Resize((64, 64)),
+                                        transforms.CenterCrop((128, 128)),
+                                        transforms.Resize(64),
                                         transforms.ToTensor(),
                                         transforms.Normalize(mean, std)
                                         ])

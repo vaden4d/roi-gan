@@ -5,6 +5,8 @@ from Denormalization import DenormResBlock
 import torch.nn.functional as F
 import numpy as np
 
+from torch.nn.utils import spectral_norm
+
 class Constant(nn.Module):
 
     def __init__(self, *tensor_size):
@@ -20,10 +22,10 @@ class Encoder(nn.Module):
 
     def __init__(self, init_size=(64, 64),
                         dest_size=(8, 8),
-                        scale=0.8,
-                        scale_channels=1.7,
+                        scale=0.5,
+                        scale_channels=4,
                         output_channels=128,
-                        kernel_size=3):
+                        kernel_size=2):
         super(Encoder, self).__init__()
 
         assert init_size[0] == init_size[1] 
@@ -35,7 +37,7 @@ class Encoder(nn.Module):
         self.scale_channels = scale_channels
         self.kernel_size = kernel_size
         self.output_channels = output_channels
-
+        '''
         # compute n_layers size
         #n_layers = (np.log(self.dest_size[0]) - np.log(self.init_size[0])) / np.log(self.scale)
         #self.n_layers = int(n_layers)
@@ -55,6 +57,7 @@ class Encoder(nn.Module):
         self.channels = [3]
         for i in range(self.n_layers):
             self.channels.append(int(self.channels[-1] * self.scale_channels))
+
         self.channels[-1] = self.output_channels
         # set layers
         self.names = []
@@ -62,40 +65,60 @@ class Encoder(nn.Module):
             name = 'conv_{}'.format(i+1)
             setattr(self,
                     name,
-                    nn.Conv2d(self.channels[i], 
+                    nn.Sequential(
+                        nn.Conv2d(self.channels[i], 
                                 self.channels[i+1], 
-                                self.kernel_size),
+                                self.kernel_size,
+                                stride=2),
+                        nn.BatchNorm2d(self.channels[i+1]),
+                    )
             )
             self.names.append(name)
 
-    def forward(self, x):
+        print('Encoder:')
+        print('Resolutions: ', self.resolutions)
+        print('Channels: ', self.channels)'''
 
-        for name, resolution in zip(self.names, self.resolutions):
+        self.layer_1 = nn.Conv2d(3, 8, kernel_size=2, stride=2)
+        self.layer_2 = nn.Conv2d(8, 16, kernel_size=2, stride=2)
+        self.layer_3 = nn.Conv2d(16, 32, kernel_size=2, stride=2)
+        self.layer_4 = nn.Conv2d(32, 64, kernel_size=2, stride=2)
+        self.layer_5 = nn.Conv2d(64, 128, kernel_size=2, stride=2)
+
+        self.mean = nn.Conv2d(128, 128, kernel_size=2, stride=2)
+        self.logvar = nn.Conv2d(128, 128, kernel_size=2, stride=2)
+
+
+    def forward(self, x):
+        
+        '''for name, resolution in zip(self.names, self.resolutions):
 
             x = getattr(self, name)(x)
             x = F.leaky_relu(x, 0.2, inplace=True)
-            x = F.interpolate(x, size=resolution, mode='bilinear', align_corners=False)
-
-        #x = self.layer_1(x)
-        #x = F.leaky_relu(x, 0.2, inplace=True)
-        #x = self.layer_2(x)
-        #x = F.leaky_relu(x, 0.2, inplace=True)
-        #x = self.layer_3(x)
-        #x = F.leaky_relu(x, 0.2)
-        #x = self.layer_4(x)
-        #x = F.leaky_relu(x, 0.2)
-        #x = self.layer_5(x)
-        #x = F.leaky_relu(x, 0.2)
+            #x = F.interpolate(x, size=resolution, mode='bilinear', align_corners=False)'''
+        
+        x = self.layer_1(x)
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_2(x)
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_3(x)
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_4(x)
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_5(x)
+        x = F.leaky_relu(x, 0.2, inplace=True)
         #x = self.layer_6(x)
         #x = F.leaky_relu(x, 0.2)
 
         #x = x.view(x.size(0), -1)
         #mean = self.dense_mean(x)
         #logvar = self.dense_logvar(x)
-        #mean = self.conv_mean(x)
-        #logvar = self.conv_logvar(x)
+        mean = self.mean(x)
+        mean = mean.view(mean.size(0), -1)
+        logvar = self.logvar(x)
+        logvar = logvar.view(logvar.size(0), -1)
 
-        return x
+        return mean, logvar
 
 class Generator(nn.Module):
 
@@ -106,7 +129,7 @@ class Generator(nn.Module):
                         kernel_size=3,
                         **kwargs):
         super(Generator, self).__init__()
-
+        '''
         assert init_size[0] == init_size[1] 
         assert dest_size[0] == dest_size[1]
 
@@ -148,36 +171,65 @@ class Generator(nn.Module):
                                     self.kernel_size),
             )
             self.names.append(name)
+        '''
 
-        #self.const = Constant(self.input_channels, *self.dest_size)
+        self.encoder = Encoder()
+        #self.const = Constant(128, 8, 8)
+
+        self.layer_1 = DenormResBlock(32, 64)
+        self.layer_2 = DenormResBlock(64, 32)
+        self.layer_3 = DenormResBlock(32, 16)
+        self.layer_4 = DenormResBlock(16, 8)
+        self.layer_5 = DenormResBlock(8, 3)
+
         self.dense_1 = nn.Linear(128, 256)
         self.dense_2 = nn.Linear(256, 256)
         self.dense_3 = nn.Linear(256, 256)
+        '''
+        print('Generator:')
+        print('Resolutions: ', self.resolutions)
+        print('Channels: ', self.channels)'''
 
     def forward(self, input):
 
         z, x, mask = input
         #x = self.const(x)
-        x = self.encoder(x)
+        mean, logvar = self.encoder(x)
+
+        z = z * logvar.mul(0.5).exp() + mean
+        x = F.pixel_shuffle(z.view(z.size(0), -1, 1, 1), 2)
 
         z = self.dense_1(z)
         z = F.leaky_relu(z, 0.2, inplace=True)
         z = self.dense_2(z)
         z = F.leaky_relu(z, 0.2, inplace=True)
         z = self.dense_3(z)
+        
+        x = self.layer_1((z, x, mask))
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_2((z, x, mask))
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_3((z, x, mask))
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_4((z, x, mask))
+        x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.layer_5((z, x, mask))
+
+        #x = torch.tanh(x)
 
         #x = z * logvar.mul(0.5).exp() + mean
-
+        '''
         for name in self.names:
 
             x = getattr(self, name)((z, x, mask))
             if x.size(1) != 3:
                 x = F.leaky_relu(x, 0.2, inplace=True)
+                #x = F.relu(x, inplace=True)
             else:
                 x = torch.tanh(x)
-
-        #return mean, logvar, x
-        return x
+        '''
+        return mean, logvar, x
+        #return x
 
 class Discriminator(nn.Module):
 
@@ -187,7 +239,8 @@ class Discriminator(nn.Module):
         self.is_wgan = is_wgan
         self.net = nn.Sequential(
             # input is (nc) x 64 x 64
-            nn.Conv2d(3, self.n_feats, 2, 2, bias=False),
+            nn.Conv2d(4, self.n_feats, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
             nn.Conv2d(self.n_feats, self.n_feats * 2, 2, bias=False),
@@ -198,30 +251,20 @@ class Discriminator(nn.Module):
             nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(self.n_feats * 4, self.n_feats * 8, 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats * 8),
+            nn.Conv2d(self.n_feats * 4, self.n_feats * 4, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(self.n_feats * 8, self.n_feats * 16, 2, 2, bias=False),
-            nn.BatchNorm2d(self.n_feats * 16),
+            nn.Conv2d(self.n_feats * 4, self.n_feats * 4, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
-            
-            nn.Conv2d(self.n_feats * 16, 1, 2, 2, bias=False)
+
+            nn.Conv2d(self.n_feats * 4, self.n_feats * 4, 2, 2, bias=False),
+            nn.BatchNorm2d(self.n_feats * 4),
+            nn.LeakyReLU(0.2, inplace=True),
         )
-        '''
-        self.net = nn.Sequential(
-
-            DenormResBlock(4, 32, (32, 32)),
-
-            DenormResBlock(32, 64, (16, 16)),
-
-            DenormResBlock(64, 128, (8, 8)),
-
-            DenormResBlock(128, 1, (4, 4)),
-
-        )
-
-        self.pooling = nn.AvgPool2d(kernel_size=2, stride=2)'''
+        
+        self.dense = nn.Linear(512, 1, bias=False)
         
     def forward(self, input):
         x, mask = input
@@ -229,7 +272,7 @@ class Discriminator(nn.Module):
         # layers
         #self.int_outputs = []
         # feature extraction
-        #x = torch.cat([x, mask], dim=1)
+        x = torch.cat([x, mask], dim=1)
         x = self.net(x)
         #for module in self.net:
         #
@@ -239,9 +282,16 @@ class Discriminator(nn.Module):
         #x = self.net((x, mask))
         #x = self.pooling(x)
         # sigmoid
-        x = x.view(-1, 1)
-        if ~self.is_wgan:
-            x = torch.sigmoid(x)
+        
+        #x = x.view(-1, 1)
+        #if ~self.is_wgan:
+        #    x = torch.sigmoid(x)
+        #    x = x.mean(axis=[1, 2, 3])
+        #else:
+        #    x = x.mean(axis=[1, 2, 3])
+        x = x.view(x.size(0), -1)
+        x = self.dense(x)
+        #x = torch.sigmoid(x)
 
         return x
 

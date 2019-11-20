@@ -105,11 +105,14 @@ discriminator = Discriminator(dis_n_features, is_wgan=is_wgan)
 roi = RoI(image_size, locals()[roi_function], len(train_data))
 roi_loader = DataLoader(roi, batch_size=batch_size, shuffle=False, num_workers=5)
 
+from utils.functions import count_parameters
 if print_summary:
     print('Generator:')
-    summary(generator, [(gen_n_input, 1, 1), (1, 64, 64)], device='cpu')
+    count_parameters(generator)
+    #summary(generator, [(gen_n_input, 1, 1), (1, 64, 64)], device='cpu')
     print('Discriminator')
-    summary(discriminator, (3, 64, 64), device='cpu')
+    count_parameters(discriminator)
+    #summary(discriminator, (3, 64, 64), device='cpu')
 
 # Initialize weights
 if chkpname_dis == None and chkpname_gen == None:
@@ -218,25 +221,36 @@ for epoch in range(0, num_epochs):
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
-            #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
             random = torch.randn(batch_size, 128).to(device)
-            #mask = roi.generate_masks(batch_size)
-            gen_images, loss_d = trainer.train_step_discriminator(random, mask, images)
+            _, loss_d = trainer.train_step_discriminator(random, mask, images)
+
+            random = torch.randn(batch_size, 128).to(device)
+            gen_images, loss_g = trainer.train_step_generator(random, mask, images)
+
+            
+            if loss_d.item() < 0.3 * (1 - epoch / num_epochs):
+                train_dis = False
+            else:
+                train_dis = True
 
             if train_dis:
-                trainer.backward_discriminator()
+                trainer.backward_discriminator(loss_d)
 
-            #for _ in range(2):
-            #random = Variable(Tensor(np.random.randn(batch_size, gen_n_input, 4, 4)))
-            random = torch.randn(batch_size, 128).to(device)
-            #mask = roi.generate_masks(batch_size)
-            gen_images, loss_g, loss_ = trainer.train_step_generator(random, mask, images)
-                
             if train_gen:
-                trainer.backward_generator()
+                trainer.backward_generator(loss_g)
+
+            if i % sample_interval == 0:
+        
+                save_image(gen_images.data[:25], 
+                            'generated/%d_%d.png' % (current_epoch, i), 
+                            nrow=5, normalize=True)
             
-            train_gen = loss_g.item() * 1.5 > loss_d.item()
-            train_dis = loss_d.item() * 1.5 > loss_g.item()
+            #if loss_d.item() < 0.3 * (1 - epoch / num_epochs):
+            #    train_dis = False
+            #else:
+            #    train_dis = True
+            #train_gen = loss_g.item() * 1.5 > loss_d.item()
+            #train_dis = loss_d.item() * 1.5 > loss_g.item()
 
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
@@ -270,7 +284,3 @@ for epoch in range(0, num_epochs):
     # save model
     save_model(trainer.gen, trainer.g_optimizer, current_epoch, trainer.num_updates, chkpdir, 'gen')
     save_model(trainer.dis, trainer.d_optimizer, current_epoch, trainer.num_updates, chkpdir, 'dis')
-
-    if epoch % sample_interval == 0:
-        
-        save_image(gen_images.data[:25], 'generated/%d.png' % current_epoch, nrow=5, normalize=True)
