@@ -2,13 +2,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.models import vgg19
 
 class DiscriminatorBlock(nn.Module):
 
     def __init__(self, input_channels, output_channels, kernel_size, n_hidden):
         super().__init__()
 
-        self.normalization = nn.BatchNorm2d(n_channels, affine=False)
+        self.normalization = nn.BatchNorm2d(input_channels, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
         
@@ -18,12 +19,16 @@ class DiscriminatorBlock(nn.Module):
         # hidden layer
         self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
 
-        self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
-        self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.gamma = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+        self.beta = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+
+        # the last conv layer
+        self.conv = nn.Conv2d(self.input_channels, self.output_channels, 
+                                kernel_size=2, stride=2)
 
     def forward(self, input):
 
-        z, x, mask = input
+        x, mask = input
 
         # normalize input
         normalized = self.normalization(x)
@@ -41,6 +46,9 @@ class DiscriminatorBlock(nn.Module):
         beta = self.beta(mask_)
 
         out = normalized * (1 + gamma) + beta
+
+        out = self.conv(out)
+        out = F.leaky_relu(out, 0.2, inplace=True)
 
         return out, mask
 
@@ -84,6 +92,39 @@ class SPADE(nn.Module):
 
         out = normalized * (1 + gamma) + beta
 
+        return out
+
+# VGG architecter, used for the perceptual loss using a pretrained VGG network
+class VGG19(torch.nn.Module):
+    def __init__(self, requires_grad=False):
+        super().__init__()
+        vgg_pretrained_features = vgg19(pretrained=True).features
+        self.slice1 = torch.nn.Sequential()
+        self.slice2 = torch.nn.Sequential()
+        self.slice3 = torch.nn.Sequential()
+        self.slice4 = torch.nn.Sequential()
+        self.slice5 = torch.nn.Sequential()
+        for x in range(2):
+            self.slice1.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(2, 7):
+            self.slice2.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(7, 12):
+            self.slice3.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(12, 21):
+            self.slice4.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(21, 30):
+            self.slice5.add_module(str(x), vgg_pretrained_features[x])
+        if not requires_grad:
+            for param in self.parameters():
+                param.requires_grad = False
+
+    def forward(self, X):
+        h_relu1 = self.slice1(X)
+        h_relu2 = self.slice2(h_relu1)
+        h_relu3 = self.slice3(h_relu2)
+        h_relu4 = self.slice4(h_relu3)
+        h_relu5 = self.slice5(h_relu4)
+        out = [h_relu1, h_relu2, h_relu3, h_relu4, h_relu5]
         return out
 
 class DenormResBlock(nn.Module):

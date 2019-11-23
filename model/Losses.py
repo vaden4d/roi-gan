@@ -102,13 +102,21 @@ class GeneratorLoss(nn.Module):
         loss = self.loss_func(fakes)
         return loss
 
-'''
-class FeatureMatching(nn.Module):
-
+from Denormalization import VGG19
+class VGGLoss(nn.Module):
     def __init__(self):
-        super(FeatureMatching, self).__init__()
-    
-    def forward(self, x, y):'''
+        super(VGGLoss, self).__init__()
+        self.vgg = VGG19()
+        self.criterion = nn.L1Loss()
+        self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
+
+    def forward(self, x, y):
+        x_vgg, y_vgg = self.vgg(x), self.vgg(y)
+        loss = 0
+        for i in range(len(x_vgg)):
+            #loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
+            loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i])
+        return loss
 
 class FeatureMatching(nn.Module):
 

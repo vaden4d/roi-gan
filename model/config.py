@@ -30,8 +30,8 @@ stabilizing_hyperparams = {'adding_noise': True
 }
 
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         'n_layers_fe_matching': list(range(18)),
-                                         #'n_layers_fe_matching': [4],
+                                         #'n_layers_fe_matching': list(range(18)),
+                                         'n_layers_fe_matching': [1, 2, 3, 4, 5],
                                          'wgan_clip_size': 1e-1,
                                          'loss': 'softplus' # 'ls', 'wgan', 'softplus'
 }

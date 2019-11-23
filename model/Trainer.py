@@ -1,6 +1,6 @@
 import torch
 from torch.autograd import Variable
-from Losses import roi_loss, FeatureMatching
+from Losses import roi_loss, FeatureMatching, VGGLoss
 from torch.nn.parallel.scatter_gather import gather
 import numpy as np
 
@@ -35,6 +35,16 @@ class Trainer:
 
         self.n_devices = torch.cuda.device_count()
 
+        self.vgg_loss = True
+
+        if self.vgg_loss:
+
+            self.vgg = VGGLoss()
+            if self.multi_gpu:
+                self.vgg = torch.nn.DataParallel(self.vgg)
+            else:
+                self.vgg = self.vgg.to(device)
+
         if self.is_fmatch:
 
             self.fe_loss = FeatureMatching()
@@ -48,7 +58,7 @@ class Trainer:
                 def _hook(name):
                     def hook(module, input, output):
                         if self.extract_features:
-                            getattr(self, name).append(output)
+                            getattr(self, name).append(output[0])
                         else:
                             pass
                     return hook
@@ -56,9 +66,10 @@ class Trainer:
                 hook = _hook(name)
 
                 if self.multi_gpu:
-                    self.dis.module.net[idx].register_forward_hook(hook)
+                    #self.dis.module.net[idx].register_forward_hook(hook)
+                    getattr(self.dis.module, 'block_{}'.format(idx)).register_forward_hook(hook)
                 else:
-                    self.dis.net[idx].register_forward_hook(hook)
+                    getattr(self.dis, 'block_{}'.format(idx)).register_forward_hook(hook)
 
     def train_step_discriminator(self, noise, mask, batch):
 
@@ -70,7 +81,21 @@ class Trainer:
         self.d_optimizer.zero_grad()
 
         self.extract_features = False
-            
+        
+        '''# dis inference and get features
+        mean_real, logvar_real, probs_real = self.dis((batch, mask))
+        noise = noise * logvar_real.mul(0.5).exp() + mean_real
+        
+        # generate samples based on features
+        generated_samples = self.gen((noise, batch, mask))
+        generated_samples = generated_samples.detach()
+
+        mean_fake, logvar_fake, probs_fake = self.dis((generated_samples, mask))
+
+        # feature matching of discriminator part
+        loss_d = ((mean_real - mean_fake)**2).mean()
+        loss_d += ((logvar_real - logvar_fake)**2).mean()'''
+
         _, _, generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples.detach(), mask))
         probs_real = self.dis((batch, mask))
@@ -97,6 +122,9 @@ class Trainer:
         loss_g = self.g_loss(probs_fake)
         # vae loss
         loss_g += -torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+
+        if self.vgg_loss:
+            loss_g += self.vgg(batch, generated_samples)
 
         if self.is_fmatch:
 
