@@ -2,13 +2,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import vgg19
 
 class DiscriminatorBlock(nn.Module):
 
     def __init__(self, input_channels, output_channels, kernel_size, n_hidden):
         super().__init__()
-
+        '''
         self.normalization = nn.BatchNorm2d(input_channels, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
@@ -17,7 +16,8 @@ class DiscriminatorBlock(nn.Module):
         self.output_channels = output_channels
 
         # hidden layer
-        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.shared_mask = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.shared_non_mask = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
 
         self.gamma = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
         self.beta = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
@@ -25,11 +25,28 @@ class DiscriminatorBlock(nn.Module):
         # the last conv layer
         self.conv = nn.Conv2d(self.input_channels, self.output_channels, 
                                 kernel_size=2, stride=2)
+        '''
+
+        self.normalization = nn.BatchNorm2d(input_channels, affine=False)
+        self.kernel_size = kernel_size
+        self.n_hidden = n_hidden
+        
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+        
+        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.gamma = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+        self.beta = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+
+        # the last conv layer
+        self.conv = nn.Conv2d(self.input_channels, self.output_channels, 
+                                kernel_size=2, stride=2)
+
 
     def forward(self, input):
-
+        
         x, mask = input
-
+        
         # normalize input
         normalized = self.normalization(x)
 
@@ -38,17 +55,29 @@ class DiscriminatorBlock(nn.Module):
         size_y = x.size(3) + 2 * self.kernel_size - 2
 
         mask_ = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
-        
-        mask_ = self.shared(mask_)
-        mask_ = F.leaky_relu(mask_, 0.2, inplace=True)
 
+        mask_ = self.shared(mask_)
+        mask_ = F.relu(mask_, inplace=True)
         gamma = self.gamma(mask_)
         beta = self.beta(mask_)
 
         out = normalized * (1 + gamma) + beta
-
         out = self.conv(out)
         out = F.leaky_relu(out, 0.2, inplace=True)
+        '''
+        mask_zone = self.shared_mask(mask_)
+        mask_zone = F.relu(mask_zone, inplace=True)
+
+        non_mask = self.shared_non_mask(1 - mask_)
+        non_mask = F.relu(non_mask, inplace=True)
+
+        gamma = self.gamma(mask_zone)
+        beta = self.beta(non_mask)
+
+        out = normalized * (1 + gamma) + x * beta 
+
+        out = self.conv(out)
+        out = F.leaky_relu(out, 0.2, inplace=True)'''
 
         return out, mask
 
@@ -57,6 +86,7 @@ class SPADE(nn.Module):
     def __init__(self, n_channels, kernel_size, n_hidden):
         super().__init__()
 
+        '''
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
@@ -64,7 +94,17 @@ class SPADE(nn.Module):
 
         # hidden layer
         self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.shared_non_mask = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
 
+        self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)'''
+
+        self.normalization = nn.BatchNorm2d(n_channels, affine=False)
+        self.kernel_size = kernel_size
+        self.n_hidden = n_hidden
+        self.n_channels = n_channels
+
+        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
         self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
         self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
 
@@ -80,17 +120,28 @@ class SPADE(nn.Module):
         size_y = x.size(3) + 2 * self.kernel_size - 2
 
         mask = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
+        '''
+        mask_ = self.shared(mask)
+        mask_ = F.relu(mask_, inplace=True)
+
+        non_mask_ = self.shared_non_mask(1 - mask)
+        non_mask_ = F.relu(non_mask_, inplace=True)
+
+        mask_ = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask_ + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
+
         
+        '''
         mask = self.shared(mask)
+        mask = F.relu(mask, inplace=True)
         mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
-        mask = F.leaky_relu(mask, 0.2, inplace=True)
+        #mask = F.leaky_relu(mask, 0.2, inplace=True)
 
         gamma = self.gamma(mask)
         beta = self.beta(mask)
 
         #mask = F.interpolate(mask, size=gamma.size()[2:], mode='nearest')
 
-        out = normalized * (1 + gamma) + beta
+        out = normalized * (1 + gamma) + beta 
 
         return out
 
@@ -171,7 +222,7 @@ class DenormResBlock(nn.Module):
         left = F.leaky_relu(left, 0.2, inplace=True)
 
         # right branch
-        right = self.spade_right((z, x, mask))
+        right = self.spade_right((z, x, 1-mask))
         right = self.conv_right(right)
         right = F.leaky_relu(right, 0.2, inplace=True)
         

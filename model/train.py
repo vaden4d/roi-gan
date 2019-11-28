@@ -226,12 +226,20 @@ for epoch in range(0, num_epochs):
 
             random = torch.randn(batch_size, 128).to(device)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
-
-            
-            if loss_d.item() < 0.3 * (1 - epoch / num_epochs):
-                train_dis = False
+            '''
+            if is_wgan:
+                
+                if loss_d.item() < -20.0 * (1+epoch) / num_epochs:
+                    train_dis = False
+                else:
+                    train_dis = True
+                pass
             else:
-                train_dis = True
+
+                if loss_d.item() < 0.4 * (1 - epoch / num_epochs):
+                    train_dis = False
+                else:
+                    train_dis = True'''
 
             if train_dis:
                 trainer.backward_discriminator(loss_d)

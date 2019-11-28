@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torchvision.models import vgg19
+
 def roi_loss(fake, real):
     '''The loss function regulates'''
 
@@ -102,20 +104,44 @@ class GeneratorLoss(nn.Module):
         loss = self.loss_func(fakes)
         return loss
 
-from Denormalization import VGG19
 class VGGLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, requires_grad=False):
         super(VGGLoss, self).__init__()
-        self.vgg = VGG19()
+        vgg_pretrained_features = vgg19(pretrained=True).features
+        self.slice1 = torch.nn.Sequential()
+        self.slice2 = torch.nn.Sequential()
+        self.slice3 = torch.nn.Sequential()
+        self.slice4 = torch.nn.Sequential()
+        self.slice5 = torch.nn.Sequential()
+        for x in range(2):
+            self.slice1.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(2, 7):
+            self.slice2.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(7, 12):
+            self.slice3.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(12, 21):
+            self.slice4.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(21, 30):
+            self.slice5.add_module(str(x), vgg_pretrained_features[x])
+        if not requires_grad:
+            for param in self.parameters():
+                param.requires_grad = False
+
         self.criterion = nn.L1Loss()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
-    def forward(self, x, y):
-        x_vgg, y_vgg = self.vgg(x), self.vgg(y)
+    def forward(self, input):
+        x, y = input
         loss = 0
-        for i in range(len(x_vgg)):
-            #loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
-            loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i])
+        for i in range(len(self.weights)):
+
+            x = getattr(self, 'slice{}'.format(i+1))(x)
+            y = getattr(self, 'slice{}'.format(i+1))(y)
+
+            loss += self.weights[i] * self.criterion(x, y)
+        
+        loss = loss.view(1)
+
         return loss
 
 class FeatureMatching(nn.Module):

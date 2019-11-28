@@ -1,5 +1,7 @@
 import torch
 from torch.autograd import Variable
+from torch.autograd import grad as torch_grad
+
 from Losses import roi_loss, FeatureMatching, VGGLoss
 from torch.nn.parallel.scatter_gather import gather
 import numpy as np
@@ -41,6 +43,7 @@ class Trainer:
 
             self.vgg = VGGLoss()
             if self.multi_gpu:
+                self.vgg = self.vgg.to(device)
                 self.vgg = torch.nn.DataParallel(self.vgg)
             else:
                 self.vgg = self.vgg.to(device)
@@ -66,10 +69,11 @@ class Trainer:
                 hook = _hook(name)
 
                 if self.multi_gpu:
-                    #self.dis.module.net[idx].register_forward_hook(hook)
-                    getattr(self.dis.module, 'block_{}'.format(idx)).register_forward_hook(hook)
+                    self.dis.module.net[idx].register_forward_hook(hook)
+                    #getattr(self.dis.module, 'block_{}'.format(idx)).register_forward_hook(hook)
                 else:
-                    getattr(self.dis, 'block_{}'.format(idx)).register_forward_hook(hook)
+                    self.dis.net[idx].register_forward_hook(hook)
+                    #getattr(self.dis, 'block_{}'.format(idx)).register_forward_hook(hook)
 
     def train_step_discriminator(self, noise, mask, batch):
 
@@ -102,6 +106,8 @@ class Trainer:
 
         loss_d = self.d_loss(probs_fake, probs_real)
 
+        #loss_d += self._gradient_penalty(batch, generated_samples, mask)
+
         return generated_samples, loss_d
 
     def train_step_generator(self, noise, mask, batch):
@@ -121,10 +127,10 @@ class Trainer:
         # or with detach?
         loss_g = self.g_loss(probs_fake)
         # vae loss
-        loss_g += -torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.vgg_loss:
-            loss_g += self.vgg(batch, generated_samples)
+            loss_g += self.vgg((batch, generated_samples)).mean()
 
         if self.is_fmatch:
 
@@ -178,16 +184,16 @@ class Trainer:
 
         if self.is_roi_loss:
 
-            loss_roi = 1e-1 * ((1 - mask) * (generated_samples - batch))**2
+            loss_roi = 2 * (mask * (generated_samples - batch)).abs()
             #loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 
             loss_g += loss_roi
 
-            #loss_int = (mask * (generated_samples - batch))**2
-            #loss_int = 0.01 * loss_int.mean()
+            loss_int = 1e-1 * ((1-mask) * (generated_samples - batch)).abs()
+            loss_int = loss_int.mean()
 
-            #loss_g += loss_int
+            loss_g += loss_int
 
         return generated_samples, loss_g
 
@@ -197,7 +203,7 @@ class Trainer:
         #check_grads(self.dis, 'dis')
         #torch.nn.utils.clip_grad_norm_(self.dis.parameters(), 1e-2)
         self.d_optimizer.step()
-        if self.is_wgan:
+        if self.is_wgan and self.wgan_clip_size:
             for parameters in self.dis.parameters():
                 parameters.data.clamp_(-self.wgan_clip_size, self.wgan_clip_size)
 
@@ -210,3 +216,36 @@ class Trainer:
     #    loss.backward()
     #    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_norm)
     #    self.optimizer.step()
+
+    def _gradient_penalty(self, real_data, generated_data, masks):
+        batch_size = real_data.size()[0]
+
+        # Calculate interpolation
+        alpha = torch.rand(batch_size, 1, 1, 1)
+        alpha = alpha.expand_as(real_data)
+        alpha = alpha.to(self.device)
+
+        interpolated = alpha * real_data.data + (1 - alpha) * generated_data.data
+        interpolated = Variable(interpolated, requires_grad=True)
+        interpolated = interpolated.to(self.device)
+
+        # Calculate probability of interpolated examples
+        prob_interpolated = self.dis((interpolated, masks))
+
+        # Calculate gradients of probabilities with respect to examples
+        gradients = torch_grad(outputs=prob_interpolated, inputs=interpolated,
+                               grad_outputs=torch.ones(prob_interpolated.size()).to(self.device),
+                               create_graph=True, retain_graph=True)[0]
+
+        # Gradients have shape (batch_size, num_channels, img_width, img_height),
+        # so flatten to easily take norm per example in batch
+        gradients = gradients.view(batch_size, -1)
+
+        # Derivatives of the gradient close to 0 can cause problems because of
+        # the square root, so manually calculate norm and add epsilon
+
+        #CHANGE MASK * GRADIENTS IF NOT WORKING
+        gradients_norm = torch.sqrt(torch.sum((gradients) ** 2, dim=1) + 1e-12)
+
+        # Return gradient penalty
+        return ((gradients_norm - 1) ** 2).mean()

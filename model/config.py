@@ -8,15 +8,15 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '3',
-              'multi_gpu': False
+              'gpu_devices': '2,3',
+              'multi_gpu': True
 }
 
 print_summary = True
 model_hyperparams = {'clip_norm': 1e-2,
                      'function': 'gaussian_roi', # roi generation function
                      'spectral_norm': True,
-                     'dis_n_features': 128 # n_features in discriminator
+                     'dis_n_features': 40 # n_features in discriminator
 }
 
 gen_hyperparams = {'init_size': (8, 8),
@@ -29,16 +29,17 @@ gen_hyperparams = {'init_size': (8, 8),
 stabilizing_hyperparams = {'adding_noise': True
 }
 
-discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         #'n_layers_fe_matching': list(range(18)),
-                                         'n_layers_fe_matching': [1, 2, 3, 4, 5],
-                                         'wgan_clip_size': 1e-1,
-                                         'loss': 'softplus' # 'ls', 'wgan', 'softplus'
+discriminator_stabilizing_hyperparams = {'fe_matching': False,
+                                         'n_layers_fe_matching': list(range(12)),
+                                         #'n_layers_fe_matching': [2, 5, 8, 11, 14],
+                                         #'wgan_clip_size': 1e-2,
+                                         'wgan_clip_size': None,
+                                         'loss': 'ls' # 'ls', 'wgan', 'softplus'
 }
 
 generator_stabilizing_hyperparams = {'roi_loss': True,
                                      'vae_loss': True,
-                                     'loss': 'softplus' # 'ls', 'wgan', 'softplus' 
+                                     'loss': 'ls' # 'ls', 'wgan', 'softplus' 
 }
 
 # train/test hyperparameters
@@ -48,8 +49,10 @@ train_hyperparams = {'num_epochs': 20,
 }
 
 # add lr-scheduling possibility
-optimizator_hyperparams = {'lr_gen': 0.0001,
-                           'lr_dis': 0.00015
+optimizator_hyperparams = {#'lr_gen': 0.0001,
+                           #'lr_dis': 0.0005
+                            'lr_gen': 0.0001,
+                            'lr_dis': 0.0005
 }
 
 # dataset constants
