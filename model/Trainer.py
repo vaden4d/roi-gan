@@ -127,7 +127,7 @@ class Trainer:
         # or with detach?
         loss_g = self.g_loss(probs_fake)
         # vae loss
-        loss_g += -0.1 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        loss_g += -0.05 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
 
         if self.vgg_loss:
             loss_g += self.vgg((batch, generated_samples)).mean()

@@ -203,13 +203,13 @@ class Generator(nn.Module):
         z = F.leaky_relu(z, 0.2, inplace=True)
         z = self.dense_3(z)
         '''
-        z, x, mask = input
-        mean, logvar = self.encoder((x, mask))
+        z, real, mask = input
+        mean, logvar = self.encoder((real, mask))
+        z_1, z_2 = z[:, :128], z[:, 128:]
+        z_1 = z_1 * logvar.mul(0.5).exp() + mean
+        x = F.pixel_shuffle(z_1.view(z_1.size(0), -1, 1, 1), 2)
 
-        z = z * logvar.mul(0.5).exp() + mean
-        x = F.pixel_shuffle(z.view(z.size(0), -1, 1, 1), 2)
-
-        z = self.dense_1(z)
+        z = self.dense_1(z_2)
         z = F.leaky_relu(z, 0.2, inplace=True)
         z = self.dense_2(z)
         z = F.leaky_relu(z, 0.2, inplace=True)
@@ -230,6 +230,8 @@ class Generator(nn.Module):
         x = self.layer_5((z, x, mask))
 
         x = torch.tanh(x)
+
+        x = mask * x + (1 - mask) * real
 
         #x = z * logvar.mul(0.5).exp() + mean
         '''

@@ -221,10 +221,10 @@ for epoch in range(0, num_epochs):
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
             
-            random = torch.randn(batch_size, 128).to(device)
+            random = torch.randn(batch_size, 2*128).to(device)
             _, loss_d = trainer.train_step_discriminator(random, mask, images)
 
-            random = torch.randn(batch_size, 128).to(device)
+            random = torch.randn(batch_size, 2*128).to(device)
             gen_images, loss_g = trainer.train_step_generator(random, mask, images)
             '''
             if is_wgan:

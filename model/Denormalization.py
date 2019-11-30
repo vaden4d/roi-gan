@@ -211,6 +211,8 @@ class DenormResBlock(nn.Module):
                                 self.kernel_size,
                                 padding=self.padding)
 
+        self.upscale = nn.Upsample(scale_factor=2, mode='nearest')
+
 
     def forward(self, input):
 
@@ -231,6 +233,7 @@ class DenormResBlock(nn.Module):
         
         left = F.pixel_shuffle(left, 2)
         left = self.conv(left)
+        #left = self.upscale(left)
 
         return left
 

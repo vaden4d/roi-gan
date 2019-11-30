@@ -2,8 +2,8 @@
 logs_hyperparams = {'chkp_dir': 'chkp/',
                     'log_dir': 'logs/train_logs/',
                     # None if training from the scratch
-                    'chkp_name_gen': None,
-                    'chkp_name_dis': None
+                    'chkp_name_gen': 'gen-epoch-19.chkp',
+                    'chkp_name_dis': 'dis-epoch-19.chkp'
 }
 
 # check gpu devices
@@ -34,12 +34,12 @@ discriminator_stabilizing_hyperparams = {'fe_matching': False,
                                          #'n_layers_fe_matching': [2, 5, 8, 11, 14],
                                          #'wgan_clip_size': 1e-2,
                                          'wgan_clip_size': None,
-                                         'loss': 'ls' # 'ls', 'wgan', 'softplus'
+                                         'loss': 'softplus' # 'ls', 'wgan', 'softplus'
 }
 
 generator_stabilizing_hyperparams = {'roi_loss': True,
                                      'vae_loss': True,
-                                     'loss': 'ls' # 'ls', 'wgan', 'softplus' 
+                                     'loss': 'softplus' # 'ls', 'wgan', 'softplus' 
 }
 
 # train/test hyperparameters
@@ -51,8 +51,8 @@ train_hyperparams = {'num_epochs': 20,
 # add lr-scheduling possibility
 optimizator_hyperparams = {#'lr_gen': 0.0001,
                            #'lr_dis': 0.0005
-                            'lr_gen': 0.0001,
-                            'lr_dis': 0.0005
+                            'lr_gen': 0.001,
+                            'lr_dis': 0.005
 }
 
 # dataset constants

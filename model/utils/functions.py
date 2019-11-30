@@ -36,7 +36,7 @@ def count_parameters(model):
     print('Total number of parameters: {}'.format(n_params))
 
 
-def weights_init(m, init_type='xavier', gain=0.1):
+def weights_init(m, init_type='xavier', gain=1.0):
     classname = m.__class__.__name__
     if classname.find('BatchNorm2d') != -1:
         if hasattr(m, 'weight') and m.weight is not None:
