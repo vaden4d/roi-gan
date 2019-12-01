@@ -231,7 +231,7 @@ class Generator(nn.Module):
 
         x = torch.tanh(x)
 
-        x = mask * x + (1 - mask) * real
+        #x = mask * x + (1 - mask) * real
 
         #x = z * logvar.mul(0.5).exp() + mean
         '''
