@@ -244,7 +244,7 @@ for epoch in range(0, num_epochs):
             if train_dis:
                 trainer.backward_discriminator(loss_d)
 
-            if train_gen:
+            if train_gen and i % 5 == 0:
                 trainer.backward_generator(loss_g)
 
             if i % sample_interval == 0:

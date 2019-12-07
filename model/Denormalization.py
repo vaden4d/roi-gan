@@ -83,7 +83,7 @@ class DiscriminatorBlock(nn.Module):
 
 class SPADE(nn.Module):
 
-    def __init__(self, n_channels, kernel_size, n_hidden):
+    def __init__(self, n_channels, kernel_size, n_hidden, control=True):
         super().__init__()
 
         '''
@@ -99,6 +99,7 @@ class SPADE(nn.Module):
         self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
         self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)'''
 
+        self.control = control
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
@@ -132,8 +133,9 @@ class SPADE(nn.Module):
         
         '''
         mask = self.shared(mask)
-        mask = F.relu(mask, inplace=True)
-        mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
+        mask = F.leaky_relu(mask, 0.2, inplace=True)
+        if self.control:
+            mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
         #mask = F.leaky_relu(mask, 0.2, inplace=True)
 
         gamma = self.gamma(mask)
@@ -195,7 +197,7 @@ class DenormResBlock(nn.Module):
                                     self.kernel_size,
                                     padding=self.padding)
 
-        self.spade_left = SPADE(self.input_channels, self.kernel_size, 128)
+        self.spade_left = SPADE(self.input_channels, self.kernel_size, 128, True)
 
         # right branch
         self.conv_right = nn.Conv2d(self.input_channels,
@@ -203,7 +205,7 @@ class DenormResBlock(nn.Module):
                                     self.kernel_size,
                                     padding=self.padding)
         
-        self.spade_right = SPADE(self.input_channels, self.kernel_size, 128)
+        self.spade_right = SPADE(self.input_channels, self.kernel_size, 128, False)
 
         # the last layer
         self.conv = nn.Conv2d(self.input_channels,
@@ -211,7 +213,7 @@ class DenormResBlock(nn.Module):
                                 self.kernel_size,
                                 padding=self.padding)
 
-        self.upscale = nn.Upsample(scale_factor=2, mode='nearest')
+        #self.upscale = nn.Upsample(scale_factor=2, mode='nearest')
 
 
     def forward(self, input):

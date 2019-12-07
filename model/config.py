@@ -2,8 +2,8 @@
 logs_hyperparams = {'chkp_dir': 'chkp/',
                     'log_dir': 'logs/train_logs/',
                     # None if training from the scratch
-                    'chkp_name_gen': 'gen-epoch-19.chkp',
-                    'chkp_name_dis': 'dis-epoch-19.chkp'
+                    'chkp_name_gen': None,
+                    'chkp_name_dis': None
 }
 
 # check gpu devices
@@ -34,16 +34,16 @@ discriminator_stabilizing_hyperparams = {'fe_matching': False,
                                          #'n_layers_fe_matching': [2, 5, 8, 11, 14],
                                          #'wgan_clip_size': 1e-2,
                                          'wgan_clip_size': None,
-                                         'loss': 'softplus' # 'ls', 'wgan', 'softplus'
+                                         'loss': 'ls' # 'ls', 'wgan', 'softplus'
 }
 
 generator_stabilizing_hyperparams = {'roi_loss': True,
                                      'vae_loss': True,
-                                     'loss': 'softplus' # 'ls', 'wgan', 'softplus' 
+                                     'loss': 'ls' # 'ls', 'wgan', 'softplus' 
 }
 
 # train/test hyperparameters
-train_hyperparams = {'num_epochs': 20,
+train_hyperparams = {'num_epochs': 100,
                     'batch_size': 128,
                     'sample_interval': 500
 }
