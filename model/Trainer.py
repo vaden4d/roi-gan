@@ -106,7 +106,7 @@ class Trainer:
 
         loss_d = self.d_loss(probs_fake, probs_real)
 
-        #loss_d += self._gradient_penalty(batch, generated_samples, mask)
+        loss_d += 1e-2 * self._gradient_penalty(batch, generated_samples, mask)
 
         return generated_samples, loss_d
 
