@@ -85,20 +85,6 @@ class Trainer:
         self.d_optimizer.zero_grad()
 
         self.extract_features = False
-        
-        '''# dis inference and get features
-        mean_real, logvar_real, probs_real = self.dis((batch, mask))
-        noise = noise * logvar_real.mul(0.5).exp() + mean_real
-        
-        # generate samples based on features
-        generated_samples = self.gen((noise, batch, mask))
-        generated_samples = generated_samples.detach()
-
-        mean_fake, logvar_fake, probs_fake = self.dis((generated_samples, mask))
-
-        # feature matching of discriminator part
-        loss_d = ((mean_real - mean_fake)**2).mean()
-        loss_d += ((logvar_real - logvar_fake)**2).mean()'''
 
         _, _, generated_samples = self.gen((noise, batch, mask))
         probs_fake = self.dis((generated_samples.detach(), mask))

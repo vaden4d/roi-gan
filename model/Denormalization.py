@@ -101,6 +101,7 @@ class SPADE(nn.Module):
 
         self.control = control
         self.normalization = nn.BatchNorm2d(n_channels, affine=False)
+        self.mask_normalization = nn.InstanceNorm2d(n_hidden, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
         self.n_channels = n_channels
@@ -133,6 +134,7 @@ class SPADE(nn.Module):
         
         '''
         mask = self.shared(mask)
+        mask = self.mask_normalization(mask)
         mask = F.leaky_relu(mask, 0.2, inplace=True)
         if self.control:
             mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
@@ -193,7 +195,7 @@ class DenormResBlock(nn.Module):
         
         # left branch
         self.conv_left = nn.Conv2d(self.input_channels,
-                                    self.input_channels * 2,
+                                    self.output_channels * 4,
                                     self.kernel_size,
                                     padding=self.padding)
 
@@ -201,17 +203,17 @@ class DenormResBlock(nn.Module):
 
         # right branch
         self.conv_right = nn.Conv2d(self.input_channels,
-                                    self.input_channels * 2,
+                                    self.output_channels * 4,
                                     self.kernel_size,
                                     padding=self.padding)
         
         self.spade_right = SPADE(self.input_channels, self.kernel_size, 128, False)
 
         # the last layer
-        self.conv = nn.Conv2d(self.input_channels,
+        '''self.conv = nn.Conv2d(self.input_channels,
                                 self.output_channels,
                                 self.kernel_size,
-                                padding=self.padding)
+                                padding=self.padding)'''
 
         #self.upscale = nn.Upsample(scale_factor=2, mode='nearest')
 
@@ -222,20 +224,28 @@ class DenormResBlock(nn.Module):
         
         # left branch
         left = self.spade_left((z, x, mask))
-        left = self.conv_left(left)
         left = F.leaky_relu(left, 0.2, inplace=True)
+        left = self.conv_left(left)
+        #left = F.leaky_relu(left, 0.2, inplace=True)
 
         # right branch
         right = self.spade_right((z, x, 1-mask))
-        right = self.conv_right(right)
         right = F.leaky_relu(right, 0.2, inplace=True)
+        right = self.conv_right(right)
+        #right = F.leaky_relu(right, 0.2, inplace=True)
         
+        '''
         left = torch.cat([left, right], dim=1)
         left = F.leaky_relu(left, 0.2, inplace=True)
         
         left = F.pixel_shuffle(left, 2)
-        left = self.conv(left)
-        #left = self.upscale(left)
+        left = self.conv(left)'''
+
+        #left = left + right
+        left = F.pixel_shuffle(left, 2)
+        right = F.pixel_shuffle(right, 2)
+        left = left + right
+        #left = F.leaky_relu(left, 0.2, inplace=True)
 
         return left
 

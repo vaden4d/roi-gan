@@ -208,21 +208,22 @@ class Generator(nn.Module):
         z_1, z_2 = z[:, :128], z[:, 128:]
         z_1 = z_1 * logvar.mul(0.5).exp() + mean
         x = F.pixel_shuffle(z_1.view(z_1.size(0), -1, 1, 1), 2)
-        '''
+        
         z = self.dense_1(z_2)
         z = F.leaky_relu(z, 0.2, inplace=True)
         z = self.dense_2(z)
         z = F.leaky_relu(z, 0.2, inplace=True)
-        z = self.dense_3(z)'''
+        z = self.dense_3(z)
 
-        z = self.dense_1(z_2)
-        z = F.leaky_relu(z, 0.2, inplace=True)
+        #z = self.dense_1(z_2)
+        #z = F.leaky_relu(z, 0.2, inplace=True)
         x = self.layer_1((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
         #x = F.relu(x, inplace=True)
 
-        z = self.dense_2(z)
-        z = F.leaky_relu(z, 0.2, inplace=True)
+        #z = self.dense_2(z)
+        #z = F.leaky_relu(z, 0.2, inplace=True)
+        
         x = self.layer_2((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
 
@@ -230,8 +231,8 @@ class Generator(nn.Module):
         x = self.layer_3((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
         #z = F.leaky_relu(z, 0.2, inplace=True)
-        z = self.dense_3(z)
-        z = F.leaky_relu(z, 0.2, inplace=True)
+        #z = self.dense_3(z)
+        #z = F.leaky_relu(z, 0.2, inplace=True)
         #x = F.relu(x, inplace=True)
         x = self.layer_4((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
@@ -280,11 +281,11 @@ class Discriminator(nn.Module):
             nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(self.n_feats * 4, self.n_feats * 2, 5, stride=1, bias=False),
-            nn.BatchNorm2d(self.n_feats * 2),
+            nn.Conv2d(self.n_feats * 4, self.n_feats * 4, 5, stride=1, bias=False),
+            nn.BatchNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(self.n_feats * 2, 1, 5, stride=1, bias=False),
+            nn.Conv2d(self.n_feats * 4, 1, 5, stride=1, bias=False),
             #nn.BatchNorm2d(self.n_feats),
             #nn.LeakyReLU(0.2, inplace=True),
         )

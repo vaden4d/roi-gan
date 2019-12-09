@@ -57,6 +57,10 @@ def wasserstein_generator_loss(fake_outputs_logprobs):
     loss = -fake_outputs_logprobs.mean()
     return loss
 
+def wasserstein_discriminator_hinge_loss(fake_outputs_logprobs, real_outputs_logprobs):
+    # -mean x min(0, D(x)-1) - mean z min(0, -D(G(z))-1) -> min
+    loss = -F.relu(real_outputs_logprobs-1).mean() - F.relu(-fake_outputs_logprobs-1).mean()
+    return loss
 
 class DiscriminatorLoss(nn.Module):
 
@@ -73,6 +77,8 @@ class DiscriminatorLoss(nn.Module):
             self.loss_func = wasserstein_discriminator_loss
         elif self.loss == 'softplus':
             self.loss_func = softplus_discriminator_loss
+        elif self.loss == 'hinge':
+            self.loss_func = wasserstein_discriminator_hinge_loss
         else:
             raise NotImplementedError
 
@@ -97,6 +103,8 @@ class GeneratorLoss(nn.Module):
             self.loss_func = wasserstein_generator_loss
         elif self.loss == 'softplus':
             self.loss_func = softplus_generator_loss
+        elif self.loss == 'hinge':
+            self.loss_func = wasserstein_generator_loss
         else:
             raise NotImplementedError
 
@@ -155,9 +163,11 @@ class FeatureMatching(nn.Module):
         assert len(x) == len(y)
         
         loss = 0
+        weights = list(range(1, len(x)+1))
+        weights = list(map(lambda z: z / len(x), weights))
 
-        for tensor_x, tensor_y in zip(x, y):
+        for tensor_x, tensor_y, weight in zip(x, y, weights):
 
-            loss += ((tensor_x - tensor_y)**2).mean()
+            loss += weight * ((tensor_x - tensor_y).abs()).mean()
 
         return loss
