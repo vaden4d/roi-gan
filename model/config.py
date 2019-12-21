@@ -8,15 +8,15 @@ logs_hyperparams = {'chkp_dir': 'chkp/',
 
 # check gpu devices
 train_mode = {'gpu': True,
-              'gpu_devices': '2,3',
-              'multi_gpu': True
+              'gpu_devices': '3',
+              'multi_gpu': False
 }
 
 print_summary = True
 model_hyperparams = {'clip_norm': 1e-2,
                      'function': 'gaussian_roi', # roi generation function
                      'spectral_norm': True,
-                     'dis_n_features': 40 # n_features in discriminator
+                     'dis_n_features': 64 # n_features in discriminator
 }
 
 gen_hyperparams = {'init_size': (8, 8),
@@ -26,20 +26,27 @@ gen_hyperparams = {'init_size': (8, 8),
                     'kernel_size': 3
 }
 
+noise_hyperparams = {
+    'noise_dim': 146,
+    'cont_dim': 10,
+    'disc_dim': 10,
+    'n_disc': 10
+}
+
 stabilizing_hyperparams = {'adding_noise': True
 }
 
-discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         #'n_layers_fe_matching': list(range(14)),
+discriminator_stabilizing_hyperparams = {'fe_matching': False,
+                                         #'n_layers_fe_matching': list(range(12)),
                                          'n_layers_fe_matching': [2, 5, 8, 11, 14],
                                          #'wgan_clip_size': 1e-2,
                                          'wgan_clip_size': None,
-                                         'loss': 'ls' # 'ls', 'wgan', 'softplus', 'hinge'
+                                         'loss': 'hinge' # 'ls', 'wgan', 'softplus', 'hinge'
 }
 
-generator_stabilizing_hyperparams = {'roi_loss': True,
+generator_stabilizing_hyperparams = {'roi_loss': False,
                                      'vae_loss': True,
-                                     'loss': 'ls' # 'ls', 'wgan', 'softplus', 'hinge'
+                                     'loss': 'hinge' # 'ls', 'wgan', 'softplus', 'hinge'
 }
 
 # train/test hyperparameters
@@ -52,7 +59,7 @@ train_hyperparams = {'num_epochs': 100,
 optimizator_hyperparams = {#'lr_gen': 0.0001,
                            #'lr_dis': 0.0005
                             'lr_gen': 0.0001,
-                            'lr_dis': 0.0005
+                            'lr_dis': 0.0004
 }
 
 # dataset constants

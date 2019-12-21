@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from EqualizedModules import Conv2d, ConvTranspose2d, Linear
+
 class DiscriminatorBlock(nn.Module):
 
     def __init__(self, input_channels, output_channels, kernel_size, n_hidden):
@@ -27,19 +29,19 @@ class DiscriminatorBlock(nn.Module):
                                 kernel_size=2, stride=2)
         '''
 
-        self.normalization = nn.BatchNorm2d(input_channels, affine=False)
+        self.normalization = nn.InstanceNorm2d(input_channels, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
         
         self.input_channels = input_channels
         self.output_channels = output_channels
         
-        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
-        self.gamma = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
-        self.beta = nn.Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+        self.shared = Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.gamma = Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
+        self.beta = Conv2d(self.n_hidden, self.input_channels, kernel_size=self.kernel_size)
 
         # the last conv layer
-        self.conv = nn.Conv2d(self.input_channels, self.output_channels, 
+        self.conv = Conv2d(self.input_channels, self.output_channels, 
                                 kernel_size=2, stride=2)
 
 
@@ -57,7 +59,7 @@ class DiscriminatorBlock(nn.Module):
         mask_ = F.interpolate(mask, size=(size_x, size_y), mode='nearest')
 
         mask_ = self.shared(mask_)
-        mask_ = F.relu(mask_, inplace=True)
+        mask_ = F.leaky_relu(mask_, 0.2)
         gamma = self.gamma(mask_)
         beta = self.beta(mask_)
 
@@ -79,7 +81,7 @@ class DiscriminatorBlock(nn.Module):
         out = self.conv(out)
         out = F.leaky_relu(out, 0.2, inplace=True)'''
 
-        return out, mask
+        return out
 
 class SPADE(nn.Module):
 
@@ -100,15 +102,17 @@ class SPADE(nn.Module):
         self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)'''
 
         self.control = control
-        self.normalization = nn.BatchNorm2d(n_channels, affine=False)
-        self.mask_normalization = nn.InstanceNorm2d(n_hidden, affine=False)
+        self.normalization = nn.InstanceNorm2d(n_channels, affine=False)
+        #self.mask_normalization = nn.InstanceNorm2d(n_hidden, affine=False)
         self.kernel_size = kernel_size
         self.n_hidden = n_hidden
         self.n_channels = n_channels
 
-        self.shared = nn.Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
-        self.gamma = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
-        self.beta = nn.Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.shared = Conv2d(1, self.n_hidden, kernel_size=self.kernel_size)
+        self.gamma = Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+        self.beta = Conv2d(self.n_hidden, n_channels, kernel_size=self.kernel_size)
+
+        #self.dense_transform = Linear(256, 256)
 
     def forward(self, input):
 
@@ -134,15 +138,18 @@ class SPADE(nn.Module):
         
         '''
         mask = self.shared(mask)
-        mask = self.mask_normalization(mask)
+        #mask = self.mask_normalization(mask)
         mask = F.leaky_relu(mask, 0.2, inplace=True)
         if self.control:
+            #z = self.dense_transform(z)
             mask = (1 + z[:, :self.n_hidden].view(z.size(0), self.n_hidden, 1, 1)) * mask + z[:, self.n_hidden:].view(z.size(0), self.n_hidden, 1, 1)
         #mask = F.leaky_relu(mask, 0.2, inplace=True)
 
         gamma = self.gamma(mask)
         beta = self.beta(mask)
 
+        gamma = F.leaky_relu(gamma, 0.2, inplace=True)
+        beta = F.leaky_relu(beta, 0.2, inplace=True)
         #mask = F.interpolate(mask, size=gamma.size()[2:], mode='nearest')
 
         out = normalized * (1 + gamma) + beta 
@@ -198,25 +205,36 @@ class DenormResBlock(nn.Module):
                                     self.output_channels * 4,
                                     self.kernel_size,
                                     padding=self.padding)
+        '''
+
+        self.deconv_left = ConvTranspose2d(self.input_channels,
+                                               self.output_channels,
+                                               kernel_size=4,
+                                               stride=2,
+                                               padding=1)
+        '''
 
         self.spade_left = SPADE(self.input_channels, self.kernel_size, 128, True)
-
+        self.spade_left_2 = SPADE(self.output_channels, self.kernel_size, 128, True)
         # right branch
         self.conv_right = nn.Conv2d(self.input_channels,
                                     self.output_channels * 4,
                                     self.kernel_size,
                                     padding=self.padding)
+
+        '''self.deconv_right = ConvTranspose2d(self.input_channels,
+                                               self.output_channels,
+                                               kernel_size=4,
+                                               stride=2,
+                                               padding=1)'''
         
         self.spade_right = SPADE(self.input_channels, self.kernel_size, 128, False)
+        self.spade_right_2 = SPADE(self.output_channels, self.kernel_size, 128, False)
+        
+        self.spade_last = SPADE(self.output_channels, self.kernel_size, 128, True)
 
-        # the last layer
-        '''self.conv = nn.Conv2d(self.input_channels,
-                                self.output_channels,
-                                self.kernel_size,
-                                padding=self.padding)'''
-
-        #self.upscale = nn.Upsample(scale_factor=2, mode='nearest')
-
+        #self.normalization_left = nn.BatchNorm2d(self.output_channels * 4)
+        #self.normalization_right = nn.BatchNorm2d(self.output_channels * 4)
 
     def forward(self, input):
 
@@ -226,13 +244,15 @@ class DenormResBlock(nn.Module):
         left = self.spade_left((z, x, mask))
         left = F.leaky_relu(left, 0.2, inplace=True)
         left = self.conv_left(left)
-        #left = F.leaky_relu(left, 0.2, inplace=True)
+        #left = self.normalization_left(left)
+        left = F.leaky_relu(left, 0.2, inplace=True)
 
         # right branch
         right = self.spade_right((z, x, 1-mask))
         right = F.leaky_relu(right, 0.2, inplace=True)
-        right = self.conv_right(right)
-        #right = F.leaky_relu(right, 0.2, inplace=True)
+        right = self.conv_right(x)
+        #right = self.normalization_right(right)
+        right = F.leaky_relu(right, 0.2, inplace=True)
         
         '''
         left = torch.cat([left, right], dim=1)
@@ -242,10 +262,21 @@ class DenormResBlock(nn.Module):
         left = self.conv(left)'''
 
         #left = left + right
-        left = F.pixel_shuffle(left, 2)
-        right = F.pixel_shuffle(right, 2)
+        #left = F.pixel_shuffle(left, 2)
+        #right = F.pixel_shuffle(right, 2)
+
+        #left = self.deconv_left(left)
+        #right = self.deconv_right(right)
+
+        #left = self.spade_left_2((z, left, mask))
+        #right = self.spade_right_2((z, right, 1-mask))
+
         left = left + right
         #left = F.leaky_relu(left, 0.2, inplace=True)
+
+        left = F.pixel_shuffle(left, 2)
+
+        left = self.spade_last((z, left, mask))
 
         return left
 

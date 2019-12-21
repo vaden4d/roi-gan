@@ -1,8 +1,9 @@
 import torch
+import torch.nn as nn
 from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
 
-from Losses import roi_loss, FeatureMatching, VGGLoss
+from Losses import roi_loss, FeatureMatching, VGGLoss, InfoLoss, tv_loss
 from torch.nn.parallel.scatter_gather import gather
 import numpy as np
 
@@ -14,7 +15,11 @@ def check_grads(model, model_name):
 class Trainer:
     def __init__(self, models, optimizers, losses, clip_norm,
         writer, num_updates, device, multi_gpu, is_fmatch, n_layers_fe_matching, 
-        is_roi_loss, is_wgan, wgan_clip_size):
+        is_roi_loss, is_wgan, wgan_clip_size, 
+        noise_dim,
+        cont_dim,
+        disc_dim,
+        n_disc):
 
         self.device = device
         self.multi_gpu = multi_gpu
@@ -38,6 +43,14 @@ class Trainer:
         self.n_devices = torch.cuda.device_count()
 
         self.vgg_loss = True
+
+        self.noise_dim = noise_dim
+        self.cont_dim = cont_dim
+        self.disc_dim = disc_dim
+        self.n_disc = n_disc
+
+        self.info_loss = InfoLoss()
+        self.disc_info_loss = nn.CrossEntropyLoss()
 
         if self.vgg_loss:
 
@@ -81,18 +94,26 @@ class Trainer:
         
         # Discriminator
         self.dis.train()
-        #self.gen.eval()
+        self.gen.eval()
+
         self.d_optimizer.zero_grad()
 
         self.extract_features = False
 
-        _, _, generated_samples = self.gen((noise, batch, mask))
-        probs_fake = self.dis((generated_samples.detach(), mask))
-        probs_real = self.dis((batch, mask))
+        with torch.no_grad():
+            generated_samples, _, _, _ = self.gen((noise, batch, mask))
+        #_, _, probs_fake = self.dis((generated_samples, mask))
+        #_, _, probs_real = self.dis((batch, mask))
+        completed_samples = mask * generated_samples + (1-mask) * batch
+        
+        probs_fake = self.dis((completed_samples, mask, True))
+        probs_real = self.dis((batch, mask, True))
 
         loss_d = self.d_loss(probs_fake, probs_real)
 
-        loss_d += 1e-2 * self._gradient_penalty(batch, generated_samples, mask)
+        loss_d += 3 * self._gradient_penalty(batch, generated_samples, mask)
+
+        loss_d += 1e-4 * (probs_real**2).mean()
 
         return generated_samples, loss_d
 
@@ -102,21 +123,37 @@ class Trainer:
 
         # Generator
         self.gen.train()
-        #self.dis.eval()
+        self.dis.eval()
+
         self.g_optimizer.zero_grad()
 
         self.extract_features = False
 
-        mean, logvar, generated_samples = self.gen((noise, batch, mask))
-        probs_fake = self.dis((generated_samples, mask)).detach()
+        generated_samples, mean_latent, logvar_latent, z = self.gen((noise, batch, mask))
+        completed_samples = mask * generated_samples + (1-mask) * batch
+        #with torch.no_grad():
+            #probs_fake = self.dis((generated_samples, mask))
+        mean, var, disc, probs_fake = self.dis((completed_samples, mask, False))
 
         # or with detach?
         loss_g = self.g_loss(probs_fake)
+
         # vae loss
-        loss_g += -0.05 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        loss_g += -0.5 * torch.mean(1 + logvar_latent - mean_latent.pow(2) - logvar_latent.exp())
+
+        info_loss = 0.05 * self.info_loss(noise[:, self.noise_dim:self.noise_dim+self.cont_dim], mean, var)
+        loss_g += info_loss
+        for i in range(self.n_disc):
+            loss_g += 0.05 * self.disc_info_loss(disc[:, i*self.disc_dim:(i+1)*self.disc_dim], 
+                                          noise[:, self.noise_dim+self.cont_dim+i*self.disc_dim:self.noise_dim+self.cont_dim+(i+1)*self.disc_dim].argmax(axis=1))
+        #print(info_loss.item())
+
+        # total variation loss
+        loss_g += tv_loss(mask * completed_samples, 0.5)
+        #loss_g += tv_loss(generated_samples, 1e-1)
 
         if self.vgg_loss:
-            loss_g += self.vgg((batch, generated_samples)).mean()
+            loss_g += 0.5 * self.vgg((generated_samples, completed_samples, batch))
 
         if self.is_fmatch:
 
@@ -133,7 +170,7 @@ class Trainer:
                 setattr(self, name, [])
 
             # inference on the real batch
-            _ = self.dis((batch, mask))
+            _ = self.dis((batch, mask, True))
 
             # collect all intermidiate variables
             # per one layer for real batch
@@ -150,7 +187,7 @@ class Trainer:
                 setattr(self, name, [])
 
             # inference on the fake batch
-            _ = self.dis((generated_samples, mask))
+            _ = self.dis((generated_samples, mask, True))
 
             # collect all intermidiate variables
             # per one layer for fake batch
@@ -166,22 +203,22 @@ class Trainer:
                 name = 'temporary_{}'.format(str(idx))
                 setattr(self, name, [])
 
-            loss_g += self.fe_loss(fake_feats, real_feats) 
+            loss_g += 0.1 * self.fe_loss(fake_feats, real_feats) 
 
         if self.is_roi_loss:
 
-            loss_roi = 2 * (mask * (generated_samples - batch)).abs()
-            #loss_roi = (generated_samples - batch)**2
+            loss_roi = 1e-2 * (mask * (generated_samples - batch)).abs()
+            loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 
-            loss_g += loss_roi
+            #loss_g += loss_roi
 
-            loss_int = 1e-1 * ((1-mask) * (generated_samples - batch)).abs()
-            loss_int = loss_int.mean()
+            #loss_int = 0.3 * ((1-mask) * (generated_samples - batch)).abs()
+            #loss_int = loss_int.mean()
 
-            loss_g += loss_int
+            #loss_g += loss_int
 
-        return generated_samples, loss_g
+        return completed_samples, loss_g, info_loss
 
     def backward_discriminator(self, loss_d):
 
@@ -216,7 +253,7 @@ class Trainer:
         interpolated = interpolated.to(self.device)
 
         # Calculate probability of interpolated examples
-        prob_interpolated = self.dis((interpolated, masks))
+        prob_interpolated = self.dis((interpolated, masks, True))
 
         # Calculate gradients of probabilities with respect to examples
         gradients = torch_grad(outputs=prob_interpolated, inputs=interpolated,

@@ -1,8 +1,29 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torchvision.models import vgg19
+import numpy as np 
+
+def tv_loss(img, tv_weight, mode='abs'):
+    """
+    Compute total variation loss.
+    Inputs:
+    - img: PyTorch Variable of shape (1, 3, H, W) holding an input image.
+    - tv_weight: Scalar giving the weight w_t to use for the TV loss.
+    Returns:
+    - loss: PyTorch Variable holding a scalar giving the total variation loss
+      for img weighted by tv_weight.
+    """
+    if mode == 'abs':
+        w_variance = torch.mean((img[:,:,:,:-1] - img[:,:,:,1:]).abs())
+        h_variance = torch.mean((img[:,:,:-1,:] - img[:,:,1:,:]).abs())
+    elif mode == 'square':
+        w_variance = torch.mean(torch.pow(img[:,:,:,:-1] - img[:,:,:,1:], 2))
+        h_variance = torch.mean(torch.pow(img[:,:,:-1,:] - img[:,:,1:,:], 2))
+    else:
+        raise NotImplementedError
+    loss = tv_weight * (h_variance + w_variance)
+    return loss
 
 def roi_loss(fake, real):
     '''The loss function regulates'''
@@ -59,7 +80,7 @@ def wasserstein_generator_loss(fake_outputs_logprobs):
 
 def wasserstein_discriminator_hinge_loss(fake_outputs_logprobs, real_outputs_logprobs):
     # -mean x min(0, D(x)-1) - mean z min(0, -D(G(z))-1) -> min
-    loss = -F.relu(real_outputs_logprobs-1).mean() - F.relu(-fake_outputs_logprobs-1).mean()
+    loss = F.relu(1-real_outputs_logprobs).mean() + F.relu(fake_outputs_logprobs+1).mean()
     return loss
 
 class DiscriminatorLoss(nn.Module):
@@ -112,6 +133,23 @@ class GeneratorLoss(nn.Module):
         loss = self.loss_func(fakes)
         return loss
 
+class InfoLoss(nn.Module):
+    """
+    Calculate the negative log likelihood
+    of normal distribution.
+    This needs to be minimised.
+    Treating Q(cj | x) as a factored Gaussian.
+    """
+    def __init__(self):
+        super(InfoLoss, self).__init__()
+
+    def forward(self, x, mu, var):
+        
+        logli = -0.5 * (var.mul(2 * np.pi) + 1e-6).log() - (x - mu).pow(2).div(var.mul(2.0) + 1e-6)
+        nll = -(logli.sum(1).mean())
+
+        return nll
+
 class VGGLoss(nn.Module):
     def __init__(self, requires_grad=False):
         super(VGGLoss, self).__init__()
@@ -139,17 +177,20 @@ class VGGLoss(nn.Module):
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
     def forward(self, input):
-        x, y = input
+        # x - generated
+        # y - completed
+        # z - real
+        x, y, z = input
         loss = 0
         for i in range(len(self.weights)):
 
             x = getattr(self, 'slice{}'.format(i+1))(x)
             y = getattr(self, 'slice{}'.format(i+1))(y)
-
-            loss += self.weights[i] * self.criterion(x, y)
+            z = getattr(self, 'slice{}'.format(i+1))(z)
+            loss += self.weights[i] * (self.criterion(x, z) + self.criterion(y, z))
+            #loss += self.criterion(x, z) + self.criterion(y, z)
+            #oss += self.weights[i] * self.criterion(x, z)
         
-        loss = loss.view(1)
-
         return loss
 
 class FeatureMatching(nn.Module):
@@ -163,11 +204,11 @@ class FeatureMatching(nn.Module):
         assert len(x) == len(y)
         
         loss = 0
-        weights = list(range(1, len(x)+1))
-        weights = list(map(lambda z: z / len(x), weights))
+        #weights = list(range(1, len(x)+1))
+        #weights = list(map(lambda z: z / len(x), weights))
 
-        for tensor_x, tensor_y, weight in zip(x, y, weights):
+        for tensor_x, tensor_y in zip(x, y):
 
-            loss += weight * ((tensor_x - tensor_y).abs()).mean()
+            loss += ((tensor_x - tensor_y).abs()).mean()
 
         return loss

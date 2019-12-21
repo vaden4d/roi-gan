@@ -67,8 +67,8 @@ def gaussian_roi(image_shape=(200, 200)):
 
     # set covariance matrix prior distribution
     ro = np.random.uniform(-0.8, 0.8)
-    sigma_x = np.random.uniform(image_shape[0] / 10, image_shape[0] / 6)
-    sigma_y = np.random.uniform(image_shape[1] / 10, image_shape[1] / 6)
+    sigma_x = np.random.uniform(image_shape[0] / 5, image_shape[0] / 3)
+    sigma_y = np.random.uniform(image_shape[1] / 5, image_shape[1] / 3)
     cov = np.array([[sigma_x**2, ro * sigma_x * sigma_y],
                     [ro * sigma_x * sigma_y, sigma_y**2]])
 
