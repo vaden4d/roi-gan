@@ -36,9 +36,9 @@ noise_hyperparams = {
 stabilizing_hyperparams = {'adding_noise': True
 }
 
-discriminator_stabilizing_hyperparams = {'fe_matching': False,
+discriminator_stabilizing_hyperparams = {'fe_matching': True,
                                          #'n_layers_fe_matching': list(range(12)),
-                                         'n_layers_fe_matching': [2, 5, 8, 11, 14],
+                                         'n_layers_fe_matching': [1, 4, 7, 10, 13],
                                          #'wgan_clip_size': 1e-2,
                                          'wgan_clip_size': None,
                                          'loss': 'hinge' # 'ls', 'wgan', 'softplus', 'hinge'
@@ -59,7 +59,7 @@ train_hyperparams = {'num_epochs': 100,
 optimizator_hyperparams = {#'lr_gen': 0.0001,
                            #'lr_dis': 0.0005
                             'lr_gen': 0.0001,
-                            'lr_dis': 0.0004
+                            'lr_dis': 0.0003
 }
 
 # dataset constants

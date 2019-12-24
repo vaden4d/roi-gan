@@ -96,12 +96,36 @@ class Trainer:
         self.dis.train()
         self.gen.eval()
 
+        if self.multi_gpu:
+            for param in self.dis.module.net.parameters():
+                param.requires_grad = True
+            for param in self.dis.module.head_local.parameters():
+                param.requires_grad = True
+            for param in self.dis.module.head_global.parameters():
+                param.requires_grad = True
+            
+            for param in self.gen.module.parameters():
+                param.requires_grad = False
+            for param in self.dis.module.q_net.parameters():
+                param.requires_grad = False
+        else:
+            for param in self.dis.net.parameters():
+                param.requires_grad = True
+            for param in self.dis.head_local.parameters():
+                param.requires_grad = True
+            for param in self.dis.head_global.parameters():
+                param.requires_grad = True
+            
+            for param in self.gen.parameters():
+                param.requires_grad = False
+            for param in self.dis.q_net.parameters():
+                param.requires_grad = False
+
         self.d_optimizer.zero_grad()
 
         self.extract_features = False
 
-        with torch.no_grad():
-            generated_samples, _, _, _ = self.gen((noise, batch, mask))
+        generated_samples, _, _, _ = self.gen((noise, batch, mask))
         #_, _, probs_fake = self.dis((generated_samples, mask))
         #_, _, probs_real = self.dis((batch, mask))
         completed_samples = mask * generated_samples + (1-mask) * batch
@@ -111,7 +135,7 @@ class Trainer:
 
         loss_d = self.d_loss(probs_fake, probs_real)
 
-        loss_d += 3 * self._gradient_penalty(batch, generated_samples, mask)
+        loss_d += 5 * self._gradient_penalty(batch, completed_samples, mask)
 
         loss_d += 1e-4 * (probs_real**2).mean()
 
@@ -124,6 +148,31 @@ class Trainer:
         # Generator
         self.gen.train()
         self.dis.eval()
+
+        if self.multi_gpu:
+            for param in self.dis.module.net.parameters():
+                param.requires_grad = False
+            for param in self.dis.module.head_local.parameters():
+                param.requires_grad = False
+            for param in self.dis.module.head_global.parameters():
+                param.requires_grad = False
+            
+            for param in self.gen.module.parameters():
+                param.requires_grad = True
+            for param in self.dis.module.q_net.parameters():
+                param.requires_grad = True
+        else:
+            for param in self.dis.net.parameters():
+                param.requires_grad = False
+            for param in self.dis.head_local.parameters():
+                param.requires_grad = False
+            for param in self.dis.head_global.parameters():
+                param.requires_grad = False
+            
+            for param in self.gen.parameters():
+                param.requires_grad = True
+            for param in self.dis.q_net.parameters():
+                param.requires_grad = True
 
         self.g_optimizer.zero_grad()
 
@@ -141,10 +190,10 @@ class Trainer:
         # vae loss
         loss_g += -0.5 * torch.mean(1 + logvar_latent - mean_latent.pow(2) - logvar_latent.exp())
 
-        info_loss = 0.05 * self.info_loss(noise[:, self.noise_dim:self.noise_dim+self.cont_dim], mean, var)
+        info_loss = 0.5 * self.info_loss(noise[:, self.noise_dim:self.noise_dim+self.cont_dim], mean, var)
         loss_g += info_loss
         for i in range(self.n_disc):
-            loss_g += 0.05 * self.disc_info_loss(disc[:, i*self.disc_dim:(i+1)*self.disc_dim], 
+            loss_g += 0.5 * self.disc_info_loss(disc[:, i*self.disc_dim:(i+1)*self.disc_dim], 
                                           noise[:, self.noise_dim+self.cont_dim+i*self.disc_dim:self.noise_dim+self.cont_dim+(i+1)*self.disc_dim].argmax(axis=1))
         #print(info_loss.item())
 
@@ -153,7 +202,7 @@ class Trainer:
         #loss_g += tv_loss(generated_samples, 1e-1)
 
         if self.vgg_loss:
-            loss_g += 0.5 * self.vgg((generated_samples, completed_samples, batch))
+            loss_g += 5 * self.vgg((generated_samples, completed_samples, batch)).mean()
 
         if self.is_fmatch:
 
@@ -187,7 +236,7 @@ class Trainer:
                 setattr(self, name, [])
 
             # inference on the fake batch
-            _ = self.dis((generated_samples, mask, True))
+            _ = self.dis((completed_samples, mask, True))
 
             # collect all intermidiate variables
             # per one layer for fake batch
@@ -208,10 +257,10 @@ class Trainer:
         if self.is_roi_loss:
 
             loss_roi = 1e-2 * (mask * (generated_samples - batch)).abs()
-            loss_roi = (generated_samples - batch)**2
+            #loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 
-            #loss_g += loss_roi
+            loss_g += loss_roi
 
             #loss_int = 0.3 * ((1-mask) * (generated_samples - batch)).abs()
             #loss_int = loss_int.mean()
@@ -262,12 +311,14 @@ class Trainer:
 
         # Gradients have shape (batch_size, num_channels, img_width, img_height),
         # so flatten to easily take norm per example in batch
+        
+        #CHANGE MASK * GRADIENTS IF NOT WORKING
+        gradients = gradients * (1-masks)
         gradients = gradients.view(batch_size, -1)
 
         # Derivatives of the gradient close to 0 can cause problems because of
         # the square root, so manually calculate norm and add epsilon
 
-        #CHANGE MASK * GRADIENTS IF NOT WORKING
         gradients_norm = torch.sqrt(torch.sum((gradients) ** 2, dim=1) + 1e-12)
 
         # Return gradient penalty

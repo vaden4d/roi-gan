@@ -200,8 +200,11 @@ class Generator(nn.Module):
         self.layer_1 = DenormResBlock(80, 100)
         self.layer_2 = DenormResBlock(132, 64)
         self.layer_3 = DenormResBlock(80, 64)
-        self.layer_4 = DenormResBlock(72, 3)
+        self.layer_4 = DenormResBlock(72, 64)
         #self.layer_5 = DenormResBlock(32, 3)
+
+        self.conv = Conv2d(64, 3, kernel_size=3, padding=1)
+        self.norm = nn.InstanceNorm2d(3)
 
         self.dense_1 = Linear(256, 256)
         self.dense_2 = Linear(256, 256)
@@ -257,13 +260,8 @@ class Generator(nn.Module):
 
         mean = z * logvar.mul(0.5).exp() + mean
         x = F.pixel_shuffle(mean.view(mean.size(0), -1, 1, 1), 4)
-        
-        '''x = mean.view(mean.size(0), -1, 1, 1)
-        
-        x = self.deconv_1(x)
         x = F.leaky_relu(x, 0.2, inplace=True)
-        x = self.deconv_2(x)
-        x = F.leaky_relu(x, 0.2, inplace=True)'''
+        
         #z = self.dense_1(z_2)
         #z = F.leaky_relu(z, 0.2, inplace=True)
 
@@ -278,12 +276,16 @@ class Generator(nn.Module):
         x = torch.cat((x, feats[1]), dim=1)
         x = self.layer_2((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
+        #x = F.relu(x, inplace=True)
+
 
         x = torch.cat((x, feats[2]), dim=1)
 
         #x = F.relu(x, inplace=True)
         x = self.layer_3((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
+        #x = F.relu(x, inplace=True)
+
         #z = F.leaky_relu(z, 0.2, inplace=True)
         #z = self.dense_3(z)
         #z = F.leaky_relu(z, 0.2, inplace=True)
@@ -291,13 +293,16 @@ class Generator(nn.Module):
         x = torch.cat((x, feats[3]), dim=1)
         x = self.layer_4((z, x, mask))
         x = F.leaky_relu(x, 0.2, inplace=True)
+        x = self.conv(x)
+        x = self.norm(x)
+
         #x = F.relu(x, inplace=True)
 
         #x = torch.cat((x, feats[3]), dim=1)
         #x = self.layer_5((z, x, mask))
-        #x = torch.tanh(x)
+        x = torch.tanh(x)
 
-        #x = mask * x + (1 - mask) * real
+        x = mask * x + (1 - mask) * real
 
         #x = z * logvar.mul(0.5).exp() + mean
         '''
@@ -333,11 +338,11 @@ class Discriminator(nn.Module):
             nn.InstanceNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            spectral_norm(Conv2d(self.n_feats * 4, self.n_feats * 4, 4, stride=1, bias=False)),
-            nn.InstanceNorm2d(self.n_feats * 4),
+            spectral_norm(Conv2d(self.n_feats * 4, self.n_feats * 8, 4, stride=1, bias=False)),
+            nn.InstanceNorm2d(self.n_feats * 8),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            spectral_norm(Conv2d(self.n_feats * 4, self.n_feats * 4, 4, stride=1, bias=False)),
+            spectral_norm(Conv2d(self.n_feats * 8, self.n_feats * 4, 4, stride=1, bias=False)),
             nn.InstanceNorm2d(self.n_feats * 4),
             nn.LeakyReLU(0.2, inplace=True)
             #nn.BatchNorm2d(self.n_feats),
@@ -345,13 +350,19 @@ class Discriminator(nn.Module):
         )
 
         self.q_net = AuxiliaryNetwork(self.net, **noise_params)
-        self.head = nn.Sequential(
-            Conv2d(self.n_feats * 4, self.n_feats, 3, stride=1, bias=False),
-            nn.InstanceNorm2d(self.n_feats),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Flatten(),
-            Linear(self.n_feats * 25, self.n_feats * 25, bias=False)
+        self.head_local = nn.Sequential(
+            Conv2d(self.n_feats * 4, 1, 3, stride=1, bias=False),
+            nn.Flatten()
+            #Linear(self.n_feats * 25, self.n_feats * 25, bias=False)
         )
+        self.head_global = nn.Sequential(
+            spectral_norm(Conv2d(self.n_feats * 4, self.n_feats * 2, 4, stride=1, bias=False)),
+            nn.InstanceNorm2d(self.n_feats * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(Conv2d(self.n_feats * 2, 1, 4, stride=1, bias=False)),
+            nn.Flatten()
+        )
+        
         '''
 
         self.names = ['block_1',
@@ -394,12 +405,15 @@ class Discriminator(nn.Module):
         x = torch.cat([x, mask], dim=1)
         if boolean:
             x = self.net(x)
-            output = self.head(x)
+            output_local = self.head_local(x)
+            output_global = self.head_global(x)
+            output = torch.cat([output_local, output_global], dim=1)
             return output
         else:
-            with torch.no_grad():
-                x = self.net(x)
-                output = self.head(x)
+            x = self.net(x)
+            output_local = self.head_local(x)
+            output_global = self.head_global(x)
+            output = torch.cat([output_local, output_global], dim=1)
             mean, var, disc = self.q_net(x)
             return mean, var, disc, output
         #x = torch.sigmoid(x)   

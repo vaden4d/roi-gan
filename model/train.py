@@ -127,7 +127,9 @@ optimizer_G = torch.optim.Adam([{'params': generator.parameters()},
                                 {'params': discriminator.q_net.parameters()}],
                                 lr=lr_gen, betas=(0.5, 0.999))
 optimizer_D = torch.optim.Adam([{'params': discriminator.net.parameters()},
-                                {'params': discriminator.head.parameters()}],
+                                {'params': discriminator.head_local.parameters()},
+                                {'params': discriminator.head_global.parameters()}
+                                ],
                                 lr=lr_dis, betas=(0.5, 0.999))
 #optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
 #optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=(0.5, 0.999))
@@ -234,8 +236,14 @@ for epoch in range(0, num_epochs):
             random = generate_noise(batch_size, **noise_hyperparams).to(device)
             _, loss_d = trainer.train_step_discriminator(random, mask, images)
 
+            if train_dis:
+                trainer.backward_discriminator(loss_d)
+
             random = generate_noise(batch_size, **noise_hyperparams).to(device)
             gen_images, loss_g, info_loss = trainer.train_step_generator(random, mask, images)
+
+            if train_gen:
+                trainer.backward_generator(loss_g)
             
             '''
             random = torch.randn(batch_size, noise_hyperparams['noise_dim']).to(device)
@@ -271,11 +279,11 @@ for epoch in range(0, num_epochs):
                 else:
                     train_dis = True'''
 
-            if train_dis:
+            '''if train_dis:
                 trainer.backward_discriminator(loss_d)
 
             if train_gen:
-                trainer.backward_generator(loss_g)
+                trainer.backward_generator(loss_g)'''
 
             if i % sample_interval == 0:
         

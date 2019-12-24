@@ -173,7 +173,6 @@ class VGGLoss(nn.Module):
             for param in self.parameters():
                 param.requires_grad = False
 
-        self.criterion = nn.L1Loss()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
     def forward(self, input):
@@ -187,9 +186,10 @@ class VGGLoss(nn.Module):
             x = getattr(self, 'slice{}'.format(i+1))(x)
             y = getattr(self, 'slice{}'.format(i+1))(y)
             z = getattr(self, 'slice{}'.format(i+1))(z)
-            loss += self.weights[i] * (self.criterion(x, z) + self.criterion(y, z))
-            #loss += self.criterion(x, z) + self.criterion(y, z)
-            #oss += self.weights[i] * self.criterion(x, z)
+            #loss += self.weights[i] * (self.criterion(x, z) + self.criterion(y, z))
+            loss += self.weights[i] * (x - z).abs().mean(axis=[1, 2, 3])
+            loss += self.weights[i] * (y - z).abs().mean(axis=[1, 2, 3])
+        #loss = loss.view(1, 1)
         
         return loss
 
@@ -209,6 +209,6 @@ class FeatureMatching(nn.Module):
 
         for tensor_x, tensor_y in zip(x, y):
 
-            loss += ((tensor_x - tensor_y).abs()).mean()
+            loss += (tensor_x - tensor_y).abs().mean()
 
         return loss
