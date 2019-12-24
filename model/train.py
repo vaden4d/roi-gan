@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader
 from Models import Generator, Discriminator
 from Trainer import Trainer
 from utils.rois import RoI, gaussian_roi, squared_roi, mixture_roi
-from utils.functions import weights_init, save_model, load_model
+from utils.functions import weights_init, save_model, load_model, generate_noise
 
 from Data import Data
 from torch.utils.data import DataLoader
@@ -62,6 +62,8 @@ clip_norm = config.model_hyperparams['clip_norm']
 roi_function = config.model_hyperparams['function']
 
 print_summary = config.print_summary
+
+noise_hyperparams = config.noise_hyperparams
 
 gen_input_channels = config.gen_hyperparams['input_channels']
 input_size = config.gen_hyperparams['init_size']
@@ -101,7 +103,8 @@ is_wgan = generator_loss_hyperparams['loss'] == 'wgan' and discriminator_loss_hy
 
 # Initialize generator, discriminator and RoI generator
 generator = Generator(**config.gen_hyperparams)
-discriminator = Discriminator(dis_n_features, is_wgan=is_wgan)
+discriminator = Discriminator(dis_n_features, is_wgan, noise_hyperparams)
+
 roi = RoI(image_size, locals()[roi_function], len(train_data))
 roi_loader = DataLoader(roi, batch_size=batch_size, shuffle=False, num_workers=5)
 
@@ -120,8 +123,16 @@ if chkpname_dis == None and chkpname_gen == None:
     discriminator.apply(weights_init)
 
 # Optimizers
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=(0.5, 0.999))
+optimizer_G = torch.optim.Adam([{'params': generator.parameters()},
+                                {'params': discriminator.q_net.parameters()}],
+                                lr=lr_gen, betas=(0.5, 0.999))
+optimizer_D = torch.optim.Adam([{'params': discriminator.net.parameters()},
+                                {'params': discriminator.head_local.parameters()},
+                                {'params': discriminator.head_global.parameters()}
+                                ],
+                                lr=lr_dis, betas=(0.5, 0.999))
+#optimizer_G = torch.optim.Adam(generator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
+#optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=(0.5, 0.999))
 
 initial_epoch = 0
 num_updates = 0
@@ -186,7 +197,8 @@ trainer = Trainer(models=[generator,
                     n_layers_fe_matching=n_layers_fe_matching,
                     is_roi_loss=is_roi_loss,
                     is_wgan=is_wgan,
-                    wgan_clip_size=wgan_clip_size
+                    wgan_clip_size=wgan_clip_size,
+                    **noise_hyperparams
                     )
 
 # saving generated
@@ -220,24 +232,58 @@ for epoch in range(0, num_epochs):
                 images += 0.05 * torch.randn(images.size()).to(device)
             # if final batch isn't equal to defined batch size in loader
             batch_size = images.size()[0]
-            
-            random = torch.randn(batch_size, 128).to(device)
+
+            random = generate_noise(batch_size, **noise_hyperparams).to(device)
             _, loss_d = trainer.train_step_discriminator(random, mask, images)
-
-            random = torch.randn(batch_size, 128).to(device)
-            gen_images, loss_g = trainer.train_step_generator(random, mask, images)
-
-            
-            if loss_d.item() < 0.3 * (1 - epoch / num_epochs):
-                train_dis = False
-            else:
-                train_dis = True
 
             if train_dis:
                 trainer.backward_discriminator(loss_d)
 
+            random = generate_noise(batch_size, **noise_hyperparams).to(device)
+            gen_images, loss_g, info_loss = trainer.train_step_generator(random, mask, images)
+
             if train_gen:
                 trainer.backward_generator(loss_g)
+            
+            '''
+            random = torch.randn(batch_size, noise_hyperparams['noise_dim']).to(device)
+            random_control = 2 * torch.rand(batch_size,
+                                            noise_hyperparams['cont_dim']
+                                            ).to(device) - 1
+            random = torch.cat([random, random_control], dim=1)
+            for i in range(noise_hyperparams['n_disc']):
+                random_control = 2 * torch.rand(batch_size,
+                                                noise_hyperparams['noise_dim']
+                                                ).to(device) - 1
+                random = torch.cat([random, random_control], dim=1)
+
+            _, loss_d = trainer.train_step_discriminator(random, mask, images)
+
+            random = torch.randn(batch_size, 250).to(device)
+            random_control = 2 * torch.rand(batch_size, 6).to(device) - 1
+            random = torch.cat([random, random_control], dim=1)
+
+            gen_images, loss_g, info_loss = trainer.train_step_generator(random, mask, images)'''
+            '''
+            if is_wgan:
+                
+                if loss_d.item() < -20.0 * (1+epoch) / num_epochs:
+                    train_dis = False
+                else:
+                    train_dis = True
+                pass
+            else:
+
+                if loss_d.item() < 0.4 * (1 - epoch / num_epochs):
+                    train_dis = False
+                else:
+                    train_dis = True'''
+
+            '''if train_dis:
+                trainer.backward_discriminator(loss_d)
+
+            if train_gen:
+                trainer.backward_generator(loss_g)'''
 
             if i % sample_interval == 0:
         
@@ -255,12 +301,14 @@ for epoch in range(0, num_epochs):
             # compute loss and accuracy
             train_loss_gen += loss_g.item()
             train_loss_dis += loss_d.item()
+            info_loss = info_loss.item()
 
-            bar.postfix = 'loss D - {:.5f}, loss G - {:.5f}, lr D - {:.7f}, lr G - {:.7f}'.format(
+            bar.postfix = 'loss D={:.4f}, InfoLoss={:.4f}, loss G={:.4f}'.format(
                                                                     loss_d,
-                                                                    loss_g,
-                                                                    lr_dis,
-                                                                    lr_gen
+                                                                    info_loss,
+                                                                    loss_g
+                                                                    #lr_dis,
+                                                                    #lr_gen
                                                                    )
             bar.update()
 

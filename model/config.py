@@ -2,8 +2,8 @@
 logs_hyperparams = {'chkp_dir': 'chkp/',
                     'log_dir': 'logs/train_logs/',
                     # None if training from the scratch
-                    'chkp_name_gen': None,
-                    'chkp_name_dis': None
+                    'chkp_name_gen': 0,
+                    'chkp_name_dis': 0
 }
 
 # check gpu devices
@@ -16,7 +16,7 @@ print_summary = True
 model_hyperparams = {'clip_norm': 1e-2,
                      'function': 'gaussian_roi', # roi generation function
                      'spectral_norm': True,
-                     'dis_n_features': 128 # n_features in discriminator
+                     'dis_n_features': 64 # n_features in discriminator
 }
 
 gen_hyperparams = {'init_size': (8, 8),
@@ -26,30 +26,40 @@ gen_hyperparams = {'init_size': (8, 8),
                     'kernel_size': 3
 }
 
+noise_hyperparams = {
+    'noise_dim': 146,
+    'cont_dim': 10,
+    'disc_dim': 10,
+    'n_disc': 10
+}
+
 stabilizing_hyperparams = {'adding_noise': True
 }
 
 discriminator_stabilizing_hyperparams = {'fe_matching': True,
-                                         'n_layers_fe_matching': list(range(18)),
-                                         #'n_layers_fe_matching': [4],
-                                         'wgan_clip_size': 1e-1,
-                                         'loss': 'softplus' # 'ls', 'wgan', 'softplus'
+                                         #'n_layers_fe_matching': list(range(12)),
+                                         'n_layers_fe_matching': [1, 4, 7, 10, 13],
+                                         #'wgan_clip_size': 1e-2,
+                                         'wgan_clip_size': None,
+                                         'loss': 'hinge' # 'ls', 'wgan', 'softplus', 'hinge'
 }
 
-generator_stabilizing_hyperparams = {'roi_loss': True,
+generator_stabilizing_hyperparams = {'roi_loss': False,
                                      'vae_loss': True,
-                                     'loss': 'softplus' # 'ls', 'wgan', 'softplus' 
+                                     'loss': 'hinge' # 'ls', 'wgan', 'softplus', 'hinge'
 }
 
 # train/test hyperparameters
-train_hyperparams = {'num_epochs': 20,
+train_hyperparams = {'num_epochs': 100,
                     'batch_size': 128,
                     'sample_interval': 500
 }
 
 # add lr-scheduling possibility
-optimizator_hyperparams = {'lr_gen': 0.0001,
-                           'lr_dis': 0.00015
+optimizator_hyperparams = {#'lr_gen': 0.0001,
+                           #'lr_dis': 0.0005
+                            'lr_gen': 0.0001,
+                            'lr_dis': 0.0003
 }
 
 # dataset constants

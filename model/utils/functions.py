@@ -4,6 +4,28 @@ import os
 import numpy as np
 from PIL import Image
 
+def generate_noise(batch_size, 
+                    noise_dim,
+                    cont_dim,
+                    disc_dim,
+                    n_disc,
+                    **kwargs):
+
+    random = torch.randn(batch_size, noise_dim)
+
+    # vector for random control
+    random_control = 2 * torch.rand(batch_size,
+                                    cont_dim) - 1
+    random = torch.cat([random, random_control], dim=1)
+
+    for _ in range(n_disc):
+
+        random_disc = torch.randint(disc_dim, [batch_size])
+        random_disc = torch.eye(disc_dim)[random_disc]
+        random = torch.cat([random, random_disc], dim=1)
+
+    return random
+
 def pil_loader(path):
     try:
         with open(path, 'rb') as f:
@@ -36,7 +58,7 @@ def count_parameters(model):
     print('Total number of parameters: {}'.format(n_params))
 
 
-def weights_init(m, init_type='xavier_uniform', gain=0.02):
+def weights_init(m, init_type='normal', gain=1.0):
     classname = m.__class__.__name__
     if classname.find('BatchNorm2d') != -1:
         if hasattr(m, 'weight') and m.weight is not None:
