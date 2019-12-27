@@ -7,7 +7,7 @@ import numpy as np
 
 from torch.nn.utils import spectral_norm
 
-from EqualizedModules import Conv2d, ConvTranspose2d, Linear
+from EqualizedModules import Conv2d, ConvTranspose2d, Linear, GatedConv2d
 
 class Encoder(nn.Module):
     def __init__(self, init_size=(64, 64),
@@ -70,16 +70,16 @@ class Encoder(nn.Module):
         print('Channels: ', self.channels)'''
 
         
-        self.layer_1 = Conv2d(4, 8, kernel_size=4, stride=2, padding=1)
-        self.normalization_1 = nn.InstanceNorm2d(8)
-        self.layer_2 = Conv2d(8, 16, kernel_size=4, stride=2, padding=1)
-        self.normalization_2 = nn.InstanceNorm2d(16)
-        self.layer_3 = Conv2d(16, 32, kernel_size=4, stride=2, padding=1)
-        self.normalization_3 = nn.InstanceNorm2d(32)
-        self.layer_4 = Conv2d(32, 64, kernel_size=4, stride=2, padding=1)
-        self.normalization_4 = nn.InstanceNorm2d(64)
-        self.layer_5 = Conv2d(64, 128, kernel_size=4, stride=2, padding=1)
-        self.normalization_5 = nn.InstanceNorm2d(128)
+        self.layer_1 = GatedConv2d(4, 8, kernel_size=4, stride=2, padding=1, bias=False)
+        #self.normalization_1 = nn.InstanceNorm2d(8)
+        self.layer_2 = GatedConv2d(8, 16, kernel_size=4, stride=2, padding=1, bias=False)
+        #self.normalization_2 = nn.InstanceNorm2d(16)
+        self.layer_3 = GatedConv2d(16, 32, kernel_size=4, stride=2, padding=1, bias=False)
+        #self.normalization_3 = nn.InstanceNorm2d(32)
+        self.layer_4 = GatedConv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=False)
+        #self.normalization_4 = nn.InstanceNorm2d(64)
+        self.layer_5 = GatedConv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=False)
+        #self.normalization_5 = nn.InstanceNorm2d(128)
 
         #self.mean = nn.Conv2d(128, 128, kernel_size=2, stride=2)
         self.mean = Linear(128 * 4, 256)
@@ -109,24 +109,24 @@ class Encoder(nn.Module):
         x = torch.cat((x, mask), dim=1)
 
         x_1 = self.layer_1(x)
-        x_1 = self.normalization_1(x_1)
-        x_1 = F.leaky_relu(x_1, 0.2, inplace=True)
+        #x_1 = self.normalization_1(x_1)
+        #x_1 = F.leaky_relu(x_1, 0.2, inplace=True)
         
         x_2 = self.layer_2(x_1)
-        x_2 = self.normalization_2(x_2)
-        x_2 = F.leaky_relu(x_2, 0.2, inplace=True)
+        #x_2 = self.normalization_2(x_2)
+        #x_2 = F.leaky_relu(x_2, 0.2, inplace=True)
 
         x_3 = self.layer_3(x_2)
-        x_3 = self.normalization_3(x_3)
-        x_3 = F.leaky_relu(x_3, 0.2, inplace=True)
+        #x_3 = self.normalization_3(x_3)
+        #x_3 = F.leaky_relu(x_3, 0.2, inplace=True)
 
         x_4 = self.layer_4(x_3)
-        x_4 = self.normalization_4(x_4)
-        x_4 = F.leaky_relu(x_4, 0.2, inplace=True)
+        #x_4 = self.normalization_4(x_4)
+        #x_4 = F.leaky_relu(x_4, 0.2, inplace=True)
 
         x_5 = self.layer_5(x_4)
-        x_5 = self.normalization_5(x_5)
-        x_5 = F.leaky_relu(x_5, 0.2)
+        #x_5 = self.normalization_5(x_5)
+        #x_5 = F.leaky_relu(x_5, 0.2)
 
         #x = x.view(x.size(0), -1)
         #mean = self.dense_mean(x)
@@ -302,7 +302,7 @@ class Generator(nn.Module):
         #x = self.layer_5((z, x, mask))
         x = torch.tanh(x)
 
-        x = mask * x + (1 - mask) * real
+        #x = mask * x + (1 - mask) * real
 
         #x = z * logvar.mul(0.5).exp() + mean
         '''

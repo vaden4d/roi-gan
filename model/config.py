@@ -2,8 +2,8 @@
 logs_hyperparams = {'chkp_dir': 'chkp/',
                     'log_dir': 'logs/train_logs/',
                     # None if training from the scratch
-                    'chkp_name_gen': 0,
-                    'chkp_name_dis': 0
+                    'chkp_name_gen': 'gen-epoch-4.chkp',
+                    'chkp_name_dis': 'dis-epoch-4.chkp'
 }
 
 # check gpu devices
@@ -65,8 +65,10 @@ optimizator_hyperparams = {#'lr_gen': 0.0001,
 # dataset constants
 dataset = 'CelebA'
 
-datasets_hyperparams = {'CelebA': {'mean': [0.5061, 0.4254, 0.3828],
-                                    'std': [0.3043, 0.2838, 0.2833],
+datasets_hyperparams = {'CelebA': {#'mean': [0.5061, 0.4254, 0.3828],
+                                   # 'std': [0.3043, 0.2838, 0.2833],
+                                    'mean': [0.5] * 3,
+                                    'std': [0.5] * 3,
                                     'path': 'celeba/',
                                     'img_shape': (64, 64)
                                     }

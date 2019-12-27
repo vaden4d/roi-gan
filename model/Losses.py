@@ -150,8 +150,30 @@ class InfoLoss(nn.Module):
 
         return nll
 
+class StyleLoss(nn.Module):
+
+    def __init__(self):
+        super(StyleLoss, self).__init__()
+
+    def gram_matrix(self, features):
+    
+        N, C, H, W = features.size()
+        # Use torch.bmm for batch multiplication of matrices
+        feat_reshaped = features.view(N, C, -1)
+        gram = torch.bmm(feat_reshaped, feat_reshaped.transpose(1, 2))
+        gram = gram / (H*W*C)
+
+        return gram
+
+    def forward(self, input):
+        
+        x, y = input
+        loss = (self.gram_matrix(x) - self.gram_matrix(y)).abs().mean(axis=[1, 2])
+
+        return loss
+
 class VGGLoss(nn.Module):
-    def __init__(self, requires_grad=False):
+    def __init__(self, requires_grad=False, weight_closs=5, weight_sloss=5):
         super(VGGLoss, self).__init__()
         vgg_pretrained_features = vgg19(pretrained=True).features
         self.slice1 = torch.nn.Sequential()
@@ -174,6 +196,10 @@ class VGGLoss(nn.Module):
                 param.requires_grad = False
 
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
+        self.style_loss = StyleLoss()
+
+        self.content_weight = weight_closs
+        self.style_weight = weight_sloss
 
     def forward(self, input):
         # x - generated
@@ -187,8 +213,11 @@ class VGGLoss(nn.Module):
             y = getattr(self, 'slice{}'.format(i+1))(y)
             z = getattr(self, 'slice{}'.format(i+1))(z)
             #loss += self.weights[i] * (self.criterion(x, z) + self.criterion(y, z))
-            loss += self.weights[i] * (x - z).abs().mean(axis=[1, 2, 3])
-            loss += self.weights[i] * (y - z).abs().mean(axis=[1, 2, 3])
+            loss += self.content_weight * self.weights[i] * (x - z).abs().mean(axis=[1, 2, 3])
+            loss += self.content_weight * self.weights[i] * (y - z).abs().mean(axis=[1, 2, 3])
+
+            #loss += self.style_weight * self.weights[i] * self.style_loss((x, z))
+            #loss += self.style_weight * self.weights[i] * self.style_loss((y, z))
         #loss = loss.view(1, 1)
         
         return loss

@@ -139,7 +139,7 @@ class Trainer:
 
         loss_d += 1e-4 * (probs_real**2).mean()
 
-        return generated_samples, loss_d
+        return completed_samples, loss_d
 
     def train_step_generator(self, noise, mask, batch):
 
@@ -202,7 +202,7 @@ class Trainer:
         #loss_g += tv_loss(generated_samples, 1e-1)
 
         if self.vgg_loss:
-            loss_g += 5 * self.vgg((generated_samples, completed_samples, batch)).mean()
+            loss_g += self.vgg((generated_samples, completed_samples, batch)).mean()
 
         if self.is_fmatch:
 
@@ -252,17 +252,17 @@ class Trainer:
                 name = 'temporary_{}'.format(str(idx))
                 setattr(self, name, [])
 
-            loss_g += 0.1 * self.fe_loss(fake_feats, real_feats) 
+            loss_g += self.fe_loss(fake_feats, real_feats) 
 
         if self.is_roi_loss:
 
-            loss_roi = 1e-2 * (mask * (generated_samples - batch)).abs()
-            #loss_roi = (generated_samples - batch)**2
+            loss_roi = 1e-5 * (mask * (generated_samples - batch)).abs()
+            loss_roi = (generated_samples - batch)**2
             loss_roi = loss_roi.mean() 
 
             loss_g += loss_roi
 
-            #loss_int = 0.3 * ((1-mask) * (generated_samples - batch)).abs()
+            #loss_int = 1e-2 * ((1-mask) * (generated_samples - batch)).abs()
             #loss_int = loss_int.mean()
 
             #loss_g += loss_int

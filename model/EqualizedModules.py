@@ -109,3 +109,30 @@ class ConvTranspose2d(nn.Module):
             return F.conv_transpose2d(x, self.weight * self.w_lrmul, self.bias * self.b_lrmul, stride=self.stride, padding=self.padding)
         else:
             return F.conv_transpose2d(x, self.weight * self.w_lrmul, stride=self.stride, padding=self.padding)
+
+class GatedConv2d(nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel_size, 
+                stride, padding, bias=True, normalization=True):
+        super(GatedConv2d, self).__init__()
+        self.conv2d = Conv2d(in_channels, out_channels, kernel_size, 
+                            stride=stride, padding=padding, bias=bias)
+        self.mask_conv2d = Conv2d(in_channels, out_channels, kernel_size, 
+                            stride=stride, padding=padding, bias=bias)
+        self.normalization = normalization
+        if self.normalization:
+            self.norm = nn.InstanceNorm2d(out_channels)
+
+    def forward(self, x):
+
+        feats = self.conv2d(x)
+        feats = F.leaky_relu(feats, 0.2, inplace=True)
+        
+        mask = self.mask_conv2d(x)
+        mask = F.sigmoid(mask)
+
+        output = mask * feats
+        if self.normalization:
+            output = self.norm(output)
+
+        return output
