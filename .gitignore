@@ -1,8 +1,10 @@
-cars_train/
 model/utils/__pycache__
 model/logs
 model/celeba/
+model/cats
 model/chkp
+model/chkp2
+generated2
 generated/
 paper/
 .ipynb_checkpoints

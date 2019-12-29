@@ -19,13 +19,13 @@ class Data(Dataset):
         if mean == None or std == None:
             self.transform = transforms.Compose([
                                         transforms.CenterCrop((128, 128)),
-                                        transforms.Resize(64),
+                                        transforms.Resize((64, 64)),
                                         transforms.ToTensor()
                                         ])
         else:
             self.transform = transforms.Compose([
                                         transforms.CenterCrop((128, 128)),
-                                        transforms.Resize(64),
+                                        transforms.Resize((64, 64)),
                                         transforms.ToTensor(),
                                         transforms.Normalize(mean, std)
                                         ])

@@ -351,7 +351,7 @@ class Discriminator(nn.Module):
 
         self.q_net = AuxiliaryNetwork(self.net, **noise_params)
         self.head_local = nn.Sequential(
-            Conv2d(self.n_feats * 4, 1, 3, stride=1, bias=False),
+            spectral_norm(Conv2d(self.n_feats * 4, 1, 3, stride=1, bias=False)),
             nn.Flatten()
             #Linear(self.n_feats * 25, self.n_feats * 25, bias=False)
         )

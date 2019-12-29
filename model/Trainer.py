@@ -190,10 +190,10 @@ class Trainer:
         # vae loss
         loss_g += -0.5 * torch.mean(1 + logvar_latent - mean_latent.pow(2) - logvar_latent.exp())
 
-        info_loss = 0.5 * self.info_loss(noise[:, self.noise_dim:self.noise_dim+self.cont_dim], mean, var)
+        info_loss = self.info_loss(noise[:, self.noise_dim:self.noise_dim+self.cont_dim], mean, var)
         loss_g += info_loss
         for i in range(self.n_disc):
-            loss_g += 0.5 * self.disc_info_loss(disc[:, i*self.disc_dim:(i+1)*self.disc_dim], 
+            loss_g += self.disc_info_loss(disc[:, i*self.disc_dim:(i+1)*self.disc_dim], 
                                           noise[:, self.noise_dim+self.cont_dim+i*self.disc_dim:self.noise_dim+self.cont_dim+(i+1)*self.disc_dim].argmax(axis=1))
         #print(info_loss.item())
 
@@ -262,10 +262,10 @@ class Trainer:
 
             loss_g += loss_roi
 
-            #loss_int = 1e-2 * ((1-mask) * (generated_samples - batch)).abs()
-            #loss_int = loss_int.mean()
+            loss_int = 1e-4 * ((1-mask) * (generated_samples - batch)).abs()
+            loss_int = loss_int.mean()
 
-            #loss_g += loss_int
+            loss_g += loss_int
 
         return completed_samples, loss_g, info_loss
 
