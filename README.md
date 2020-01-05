@@ -6,3 +6,5 @@ Also were inspected controllability properties on CelebA data samples.
 RoI-GAN uses modified SPADE blocks - denormalization layers - and makes two-stage style modulation (like in StyleGAN), with random variable (for control) and with convolved RoI (for mask stylization). To enhance controllability properties, during training was used Mutual Information Maximization between random vector for control and incompressible noise. As the result, we can control the local generation using only a few random variables for it.
 
 Model was validated on the CelebA, Cats and Cars datasets (with 64x64 resolution).
+
+The weights for the models and datasets (only test parts) were located in the Drive [Link](https://drive.google.com/open?id=1QQhg4FZn-gf2ivu55Z1dmWuWf0DZ33B7). 
