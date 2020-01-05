@@ -1,4 +1,3 @@
-# Region-Selected Image Generation (RoI-GAN)
-Master thesis [UCU]
-![Images with masks](model/images/images_masked.png)
-![Reconstructed from masks](model/images/reconstructed.png)
+# Region-Selected Image Generation (RoI-GAN) -- Master thesis [UCU]
+![Comparison with FMM and GLCIC](images/comparison.png)
+![Examples of controllability on the CelebA](images/reconstructed.png)
