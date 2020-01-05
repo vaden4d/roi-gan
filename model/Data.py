@@ -23,12 +23,20 @@ class Data(Dataset):
                                         transforms.ToTensor()
                                         ])
         else:
-            self.transform = transforms.Compose([
-                                        #transforms.CenterCrop((128, 128)),
-                                        transforms.Resize((64, 64)),
-                                        transforms.ToTensor(),
-                                        transforms.Normalize(mean, std)
-                                        ])
+            if 'celeba' in self.data_path:
+                self.transform = transforms.Compose([
+                                            transforms.CenterCrop((128, 128)),
+                                            transforms.Resize((64, 64)),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize(mean, std)
+                                            ])
+            else:
+                self.transform = transforms.Compose([
+                                            transforms.CenterCrop((128, 128)),
+                                            transforms.Resize((64, 64)),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize(mean, std)
+                                            ])
         
         _, _, self.files = next(os.walk(self.data_path))
         self.files = list(filter(lambda x: x.endswith('.jpg') or x.endswith('.png'), self.files))
