@@ -1,6 +1,10 @@
 model/utils/__pycache__
 model/logs
-model/celeba/
+model/celeba
+model/celeba_train/
+model/celeba_test
+model/cars_train
+model/cars_test
 model/cats
 model/chkp
 model/chkp2

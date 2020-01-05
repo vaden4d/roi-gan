@@ -25,14 +25,6 @@ def tv_loss(img, tv_weight, mode='abs'):
     loss = tv_weight * (h_variance + w_variance)
     return loss
 
-def roi_loss(fake, real):
-    '''The loss function regulates'''
-
-    loss = fake - real
-    loss = torch.mean(loss**2)
-
-    return loss
-
 def vanilla_generator_loss(fake_outputs_probs):
     eps = 1e-12
     # log (1 - D(G(z))) -> min w.r.t G - standard setting

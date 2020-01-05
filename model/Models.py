@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torchsummary import summary
-from Denormalization import DenormResBlock, DiscriminatorBlock
+from Denormalization import DenormResBlock
 import torch.nn.functional as F
 import numpy as np
 
@@ -27,48 +27,6 @@ class Encoder(nn.Module):
         self.scale_channels = scale_channels
         self.kernel_size = kernel_size
         self.output_channels = output_channels
-        '''
-        # compute n_layers size
-        #n_layers = (np.log(self.dest_size[0]) - np.log(self.init_size[0])) / np.log(self.scale)
-        #self.n_layers = int(n_layers)
-
-        resolutions = [self.init_size[0] * scale]
-        #for i in range(self.n_layers + 1):
-        #    resolutions.append(resolutions[-1] * self.scale)
-        #resolutions[-1] = self.dest_size[-1]
-        while True:
-            resolutions.append(resolutions[-1] * scale)
-            if resolutions[-1] < self.dest_size[0]:
-                break
-        resolutions[-1] = self.dest_size[0]
-        self.resolutions = list(map(lambda x: torch.Size([int(x)]) * 2, resolutions))
-        self.n_layers = len(self.resolutions)
-
-        self.channels = [3]
-        for i in range(self.n_layers):
-            self.channels.append(int(self.channels[-1] * self.scale_channels))
-
-        self.channels[-1] = self.output_channels
-        # set layers
-        self.names = []
-        for i in range(self.n_layers):
-            name = 'conv_{}'.format(i+1)
-            setattr(self,
-                    name,
-                    nn.Sequential(
-                        nn.Conv2d(self.channels[i], 
-                                self.channels[i+1], 
-                                self.kernel_size,
-                                stride=2),
-                        nn.BatchNorm2d(self.channels[i+1]),
-                    )
-            )
-            self.names.append(name)
-
-        print('Encoder:')
-        print('Resolutions: ', self.resolutions)
-        print('Channels: ', self.channels)'''
-
         
         self.layer_1 = GatedConv2d(4, 8, kernel_size=4, stride=2, padding=1, bias=False)
         #self.normalization_1 = nn.InstanceNorm2d(8)
@@ -85,24 +43,9 @@ class Encoder(nn.Module):
         self.mean = Linear(128 * 4, 256)
         self.logvar = Linear(128 * 4, 256)
         #self.logvar = nn.Conv2d(128, 128, kernel_size=2, stride=2)
-        
-        '''
-        self.layer_1 = DiscriminatorBlock(3, 8, 3, 128)
-        self.layer_2 = DiscriminatorBlock(8, 16, 3, 128)
-        self.layer_3 = DiscriminatorBlock(16, 32, 3, 128)
-        self.layer_4 = DiscriminatorBlock(32, 64, 3, 128)
-        self.layer_5 = DiscriminatorBlock(64, 128, 3, 128)
-
-        self.mean = nn.Linear(128 * 4, 128)'''
 
     def forward(self, input):
         x, mask = input
-        '''for name, resolution in zip(self.names, self.resolutions):
-
-            x = getattr(self, name)(x)
-            x = F.leaky_relu(x, 0.2, inplace=True)
-            #x = F.interpolate(x, size=resolution, mode='bilinear', align_corners=False)'''
-
         #noise = torch.randn(x.size(), device=x.device)
         #x = x * (1-mask) + noise * mask
         x = x * (1-mask)
@@ -150,52 +93,8 @@ class Generator(nn.Module):
                         kernel_size=3,
                         **kwargs):
         super(Generator, self).__init__()
-        '''
-        assert init_size[0] == init_size[1] 
-        assert dest_size[0] == dest_size[1]
-
-        self.init_size = init_size
-        self.dest_size = dest_size
-        self.scale = scale
-        self.kernel_size = kernel_size
-        self.input_channels = input_channels
 
         self.encoder = Encoder()
-
-        # compute n_layers size
-        n_layers = (np.log(self.dest_size[0]) - np.log(self.init_size[0])) / np.log(self.scale)
-        self.n_layers = int(n_layers)
-
-        resolutions = [self.init_size[0]]
-        for i in range(self.n_layers + 1):
-            resolutions.append(resolutions[-1] * self.scale)
-        resolutions[-1] = self.dest_size[-1]
-        self.resolutions = list(map(lambda x: torch.Size([int(x)]) * 2, resolutions))
-
-        #print(channels_scale)
-        #I scale**(n_layers) = O
-        self.channels = [self.input_channels]
-        for i in range(self.n_layers + 1):
-            self.channels.append(int(self.channels[-1] / self.scale))
-        self.channels[-1] = 3
-
-        #print(self.channels)
-
-        self.names = []
-        for i in range(self.n_layers + 1):
-            name = 'resblock_{}'.format(i+1)
-            setattr(self,
-                    name,
-                    DenormResBlock(self.channels[i], 
-                                    self.channels[i+1], 
-                                    self.resolutions[i+1],
-                                    self.kernel_size),
-            )
-            self.names.append(name)
-        '''
-
-        self.encoder = Encoder()
-        #self.const = Constant(128, 8, 8)
 
         self.layer_1 = DenormResBlock(80, 100)
         self.layer_2 = DenormResBlock(132, 64)
@@ -214,27 +113,8 @@ class Generator(nn.Module):
         self.normalization_2 = nn.BatchNorm1d(256)
         self.normalization_3 = nn.BatchNorm1d(256)
 
-        '''
-        print('Generator:')
-        print('Resolutions: ', self.resolutions)
-        print('Channels: ', self.channels)'''
-
     def forward(self, input):
-        '''
-        z, x, mask = input
-        noise_style, noise_masks = z[:, :128], z[:, 128:]
-        #x = self.const(x)
-        mean, logvar = self.encoder((x, mask))
-
-        noise_style = noise_style * logvar.mul(0.5).exp() + mean
-        x = F.pixel_shuffle(noise_style.view(noise_style.size(0), -1, 1, 1), 2)
-
-        z = self.dense_1(noise_masks)
-        z = F.leaky_relu(z, 0.2, inplace=True)
-        z = self.dense_2(z)
-        z = F.leaky_relu(z, 0.2, inplace=True)
-        z = self.dense_3(z)
-        '''
+        
         z, real, mask = input
         #mean, logvar = self.encoder((real, mask))
         feats, mean, logvar = self.encoder((real, mask))
@@ -305,16 +185,7 @@ class Generator(nn.Module):
         #x = mask * x + (1 - mask) * real
 
         #x = z * logvar.mul(0.5).exp() + mean
-        '''
-        for name in self.names:
-
-            x = getattr(self, name)((z, x, mask))
-            if x.size(1) != 3:
-                x = F.leaky_relu(x, 0.2, inplace=True)
-                #x = F.relu(x, inplace=True)
-            else:
-                x = torch.tanh(x)
-        '''
+        
         return x, mean, logvar, z
         #return x
 
@@ -351,57 +222,22 @@ class Discriminator(nn.Module):
 
         self.q_net = AuxiliaryNetwork(self.net, **noise_params)
         self.head_local = nn.Sequential(
-            spectral_norm(Conv2d(self.n_feats * 4, 1, 3, stride=1, bias=False)),
+            Conv2d(self.n_feats * 4, 1, 3, stride=1, bias=False),
             nn.Flatten()
             #Linear(self.n_feats * 25, self.n_feats * 25, bias=False)
         )
         self.head_global = nn.Sequential(
-            spectral_norm(Conv2d(self.n_feats * 4, self.n_feats * 2, 4, stride=1, bias=False)),
+            Conv2d(self.n_feats * 4, self.n_feats * 2, 4, stride=1, bias=False),
             nn.InstanceNorm2d(self.n_feats * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            spectral_norm(Conv2d(self.n_feats * 2, 1, 4, stride=1, bias=False)),
+            Conv2d(self.n_feats * 2, 1, 4, stride=1, bias=False),
             nn.Flatten()
         )
-        
-        '''
-
-        self.names = ['block_1',
-                    'block_2',
-                    'block_3',
-                    'block_4',
-                    'block_5']
-        
-        self.block_1 = DiscriminatorBlock(3, 32, 3, 128)
-        self.block_2 = DiscriminatorBlock(32, 64, 3, 128)
-        self.block_3 = DiscriminatorBlock(64, 128, 3, 128)
-        self.block_4 = DiscriminatorBlock(128, 256, 3, 128)
-        self.block_5 = DiscriminatorBlock(256, 64, 3, 128)
-
-        self.flatten = nn.Flatten()'''
         
     def forward(self, input):
         x, mask, boolean = input
         #x, mask = input
-        '''
-        input = self.block_1(input)
-        input = self.block_2(input)
-        input = self.block_3(input)
-        input = self.block_4(input)
-        x, _ = self.block_5(input)
-        
-        x = self.flatten(x)
-        #x = self.dense(x)
 
-        x = self.block_1(x)
-        x = self.block_2(x)
-        x = self.block_3(x)
-        x = self.block_4(x)
-        x = self.block_5(x)'''
-
-        '''
-        for name, param in self.named_parameters():
-            fan_in = param.data.size(1) * param.data[0][0].numel()
-            getattr(self, name).weight.data *= torch.sqrt(2.0 / fan_in) '''
         x = torch.cat([x, mask], dim=1)
         if boolean:
             x = self.net(x)
@@ -416,9 +252,6 @@ class Discriminator(nn.Module):
             output = torch.cat([output_local, output_global], dim=1)
             mean, var, disc = self.q_net(x)
             return mean, var, disc, output
-        #x = torch.sigmoid(x)   
-
-        #return mean, var, output
 
 class AuxiliaryNetwork(nn.Module):
 

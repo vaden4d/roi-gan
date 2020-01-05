@@ -42,6 +42,7 @@ device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
 
 logdir = config.logs_hyperparams['log_dir']
 chkpdir = config.logs_hyperparams['chkp_dir']
+gendir = config.logs_hyperparams['gen_dir']
 chkpname_gen = config.logs_hyperparams['chkp_name_gen']
 chkpname_dis = config.logs_hyperparams['chkp_name_dis']
 
@@ -288,7 +289,7 @@ for epoch in range(0, num_epochs):
             if i % sample_interval == 0:
         
                 save_image(gen_images.data[:25], 
-                            'generated/%d_%d.png' % (current_epoch, i), 
+                            '{}{}_{}.png'.format(gendir, current_epoch, i), 
                             nrow=5, normalize=True)
             
             #if loss_d.item() < 0.3 * (1 - epoch / num_epochs):

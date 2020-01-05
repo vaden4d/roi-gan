@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
 
-from Losses import roi_loss, FeatureMatching, VGGLoss, InfoLoss, tv_loss
+from Losses import FeatureMatching, VGGLoss, InfoLoss, tv_loss
 from torch.nn.parallel.scatter_gather import gather
 import numpy as np
 

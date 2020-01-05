@@ -2,7 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torch.nn.utils import spectral_norm
+
 class Conv2d(nn.Module):
+    '''Equalized Learning Rate convolution
+    layer'''
     def __init__(self,
                  input_channels,
                  output_channels,
@@ -40,6 +44,8 @@ class Conv2d(nn.Module):
             return F.conv2d(x, self.weight * self.w_lrmul, stride=self.stride, padding=self.padding)
 
 class Linear(nn.Module):
+    '''Equalized Learning Rate linear
+    layer'''
     def __init__(self,
                  in_channels,
                  out_channels,
@@ -113,12 +119,39 @@ class ConvTranspose2d(nn.Module):
 class GatedConv2d(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size, 
-                stride, padding, bias=True, normalization=True):
+                stride, padding=0, bias=True, normalization=True):
         super(GatedConv2d, self).__init__()
         self.conv2d = Conv2d(in_channels, out_channels, kernel_size, 
                             stride=stride, padding=padding, bias=bias)
         self.mask_conv2d = Conv2d(in_channels, out_channels, kernel_size, 
                             stride=stride, padding=padding, bias=bias)
+        self.normalization = normalization
+        if self.normalization:
+            self.norm = nn.InstanceNorm2d(out_channels)
+
+    def forward(self, x):
+
+        feats = self.conv2d(x)
+        feats = F.leaky_relu(feats, 0.2, inplace=True)
+        
+        mask = self.mask_conv2d(x)
+        mask = F.sigmoid(mask)
+
+        output = mask * feats
+        if self.normalization:
+            output = self.norm(output)
+
+        return output
+
+class GatedConv2dWithSpectral(nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel_size, 
+                stride, padding=0, bias=True, normalization=True):
+        super(GatedConv2dWithSpectral, self).__init__()
+        self.conv2d = spectral_norm(Conv2d(in_channels, out_channels, kernel_size, 
+                            stride=stride, padding=padding, bias=bias))
+        self.mask_conv2d = spectral_norm(Conv2d(in_channels, out_channels, kernel_size, 
+                            stride=stride, padding=padding, bias=bias))
         self.normalization = normalization
         if self.normalization:
             self.norm = nn.InstanceNorm2d(out_channels)

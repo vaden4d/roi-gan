@@ -1,10 +1,11 @@
 # checkpoints
-logs_hyperparams = {'chkp_dir': 'chkp/',
+logs_hyperparams = {'chkp_dir': 'chkp2/',
                     'log_dir': 'logs/train_logs/',
+                    'gen_dir': 'generated2/',
                     # None if training from the scratch
                     'chkp_name_gen': 0,
                     'chkp_name_dis': 0
-}
+                    }
 
 # check gpu devices
 train_mode = {'gpu': True,
@@ -50,8 +51,8 @@ generator_stabilizing_hyperparams = {'roi_loss': False,
 }
 
 # train/test hyperparameters
-train_hyperparams = {'num_epochs': 100,
-                    'batch_size': 128,
+train_hyperparams = {'num_epochs': 400,
+                    'batch_size': 32,
                     'sample_interval': 500
 }
 
@@ -63,13 +64,13 @@ optimizator_hyperparams = {#'lr_gen': 0.0001,
 }
 
 # dataset constants
-dataset = 'CelebA'
+dataset = 'Cats'
 
 datasets_hyperparams = {'CelebA': {#'mean': [0.5061, 0.4254, 0.3828],
                                    # 'std': [0.3043, 0.2838, 0.2833],
                                     'mean': [0.5] * 3,
                                     'std': [0.5] * 3,
-                                    'path': 'celeba/',
+                                    'path': 'celeba_train/',
                                     'img_shape': (64, 64)
                                     },
                         'Cats': {#'mean': [0.5061, 0.4254, 0.3828],
@@ -77,6 +78,13 @@ datasets_hyperparams = {'CelebA': {#'mean': [0.5061, 0.4254, 0.3828],
                                     'mean': [0.5] * 3,
                                     'std': [0.5] * 3,
                                     'path': 'cats/',
+                                    'img_shape': (64, 64)
+                                    },
+                        'Cars': {#'mean': [0.5061, 0.4254, 0.3828],
+                                   # 'std': [0.3043, 0.2838, 0.2833],
+                                    'mean': [0.5] * 3,
+                                    'std': [0.5] * 3,
+                                    'path': 'cars_train/',
                                     'img_shape': (64, 64)
                                     }
                         }
